@@ -16,7 +16,7 @@
 //! to `NAND(false, false)` being the only true one gave the solution
 //!
 //! ## XOR Gate
-//! NOT(OR)
+//! Looked for two gates that with 0 bit on opposite ends and 1 bit otherwise. 
 //!
 //! ## Multiplexor
 //! Many false starts, most of which were due to it being late. The big step towards the solution was thinking
@@ -54,8 +54,8 @@
 //! 
 //! ## 4-way 1-bit Demultiplexor gate
 //! This one required an unexpectedly complex complement of gates. The idea is to find gate combinations that
-//! are one bit for one selector and the other bit for the other three selectors. For 00, that would be XOR 
-//! (true for 00, false for all others). Demultiplexors can then be used to slot the input bit into the right
+//! are one bit for one selector and the other bit for the other three selectors. For 00, that would be OR 
+//! (false for 00, true for all others). Demultiplexors can then be used to slot the input bit into the right
 //! position.
 //! 
 //! ## 8-way 1-bit Demultiplexor gate
@@ -172,9 +172,9 @@ impl Gate for Demultiplexor4Way1BitGate {
     fn calc(input: Self::In) -> Self::Out {
         let (ins, sel) = input;
         [
-            MultiplexorGate::calc([false, ins, XOrGate::calc([sel[0], sel[1]])]),
-            MultiplexorGate::calc([false, ins, XOrGate::calc([sel[0], NotGate::calc(sel[1])])]),
-            MultiplexorGate::calc([false, ins, XOrGate::calc([NotGate::calc(sel[0]), sel[1]])]),
+            MultiplexorGate::calc([ins, false, OrGate::calc([sel[0], sel[1]])]),
+            MultiplexorGate::calc([ins, false, OrGate::calc([sel[0], NotGate::calc(sel[1])])]),
+            MultiplexorGate::calc([ins, false, OrGate::calc([NotGate::calc(sel[0]), sel[1]])]),
             MultiplexorGate::calc([false, ins, AndGate::calc([sel[0], sel[1]])]),
         ]
     }
@@ -605,15 +605,15 @@ impl Gate for OrGate {
     }
 }
 
-/// The stately XOr gate
+/// The always different XOr gate
 ///
 /// # Examples
 ///
 /// ```
 /// use rust_elements_computing_systems::gates::{XOrGate, Gate};
-/// assert_eq!(XOrGate::calc([false, false]), true);
-/// assert_eq!(XOrGate::calc([true, false]), false);
-/// assert_eq!(XOrGate::calc([false, true]), false);
+/// assert_eq!(XOrGate::calc([false, false]), false);
+/// assert_eq!(XOrGate::calc([true, false]), true);
+/// assert_eq!(XOrGate::calc([false, true]), true);
 /// assert_eq!(XOrGate::calc([true, true]), false);
 /// ```
 ///
@@ -624,6 +624,9 @@ impl Gate for XOrGate {
     type Out = bool;
 
     fn calc(input: Self::In) -> Self::Out {
-        NotGate::calc(OrGate::calc(input))
+        AndGate::calc([
+            OrGate::calc([input[0], input[1]]),
+            NandGate::calc([input[0], input[1]]),
+        ])
     }
 }
