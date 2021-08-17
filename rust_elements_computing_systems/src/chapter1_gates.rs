@@ -16,7 +16,7 @@
 //! to `NAND(false, false)` being the only true one gave the solution
 //!
 //! ## XOR Gate
-//! Looked for two gates that with 0 bit on opposite ends and 1 bit otherwise. 
+//! Looked for two gates that with 0 bit on opposite ends and 1 bit otherwise.
 //!
 //! ## Multiplexor
 //! Many false starts, most of which were due to it being late. The big step towards the solution was thinking
@@ -51,25 +51,18 @@
 //!
 //! ## 8-way 16-bit Multiplexor gate
 //! Same logic as the 4-way Multiplexor
-//! 
+//!
 //! ## 4-way 1-bit Demultiplexor gate
 //! This one required an unexpectedly complex complement of gates. The idea is to find gate combinations that
-//! are one bit for one selector and the other bit for the other three selectors. For 00, that would be OR 
+//! are one bit for one selector and the other bit for the other three selectors. For 00, that would be OR
 //! (false for 00, true for all others). Demultiplexors can then be used to slot the input bit into the right
 //! position.
-//! 
+//!
 //! ## 8-way 1-bit Demultiplexor gate
 //! This was done differently that the 4-way gate. Rather than use a Multiplexor and tediously construct eight
 //! unique flags that place the input flag in the right position, two 4-way Demultiplexors were used. The trick
-//! in that approach was to use the first selector bit to turn off the input bit for the appropriate 
-//! 4-way Demultiplexor. 
-
-pub trait Gate {
-    type In;
-    type Out;
-
-    fn calc(input: Self::In) -> Self::Out;
-}
+//! in that approach was to use the first selector bit to turn off the input bit for the appropriate
+//! 4-way Demultiplexor.
 
 /// The Not And gate. The only gate that is implemented with Rust bitwise operators.
 /// All other gate logic will use only other gates.
@@ -77,22 +70,15 @@ pub trait Gate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{NandGate, Gate};
-/// assert_eq!(NandGate::calc([false, false]), true);
-/// assert_eq!(NandGate::calc([true, false]), true);
-/// assert_eq!(NandGate::calc([false, true]), true);
-/// assert_eq!(NandGate::calc([true, true]), false);
+/// use rust_elements_computing_systems::gates::nand_gate;
+/// assert_eq!(nand_gate(false, false), true);
+/// assert_eq!(nand_gate(true, false), true);
+/// assert_eq!(nand_gate(false, true), true);
+/// assert_eq!(nand_gate(true, true), false);
 /// ```
 ///
-pub struct NandGate;
-
-impl Gate for NandGate {
-    type In = [bool; 2];
-    type Out = bool;
-
-    fn calc(input: Self::In) -> Self::Out {
-        !(input[0] & input[1])
-    }
+pub fn nand_gate(a: bool, b: bool) -> bool {
+    !(a & b)
 }
 
 /// The beloved And gate.
@@ -100,51 +86,70 @@ impl Gate for NandGate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{AndGate, Gate};
-/// assert_eq!(AndGate::calc([false, false]), false);
-/// assert_eq!(AndGate::calc([true, false]), false);
-/// assert_eq!(AndGate::calc([false, true]), false);
-/// assert_eq!(AndGate::calc([true, true]), true);
+/// use rust_elements_computing_systems::gates::and_gate;
+/// assert_eq!(and_gate(false, false), false);
+/// assert_eq!(and_gate(true, false), false);
+/// assert_eq!(and_gate(false, true), false);
+/// assert_eq!(and_gate(true, true), true);
 /// ```
 ///
-pub struct AndGate;
-
-impl Gate for AndGate {
-    type In = [bool; 2];
-    type Out = bool;
-
-    fn calc(input: Self::In) -> Self::Out {
-        NotGate::calc(NandGate::calc(input))
-    }
+pub fn and_gate(a: bool, b: bool) -> bool {
+    not_gate(nand_gate(a, b))
 }
 
-/// The divisive Demultiplexor gate. Input (first element), selector (second element).
-/// For output, if selector=0 then [input, 0] else [0, input]. In words, put input in
-/// first or second position of output given the selector.
+/// The can-do-it-all Multi-Bit And gate. Does AND operation on each position.
+/// # Examples
+///
+/// ```
+/// use rust_elements_computing_systems::gates::and_multibit_gate;
+/// assert_eq!(
+///     and_multibit_gate(
+///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
+///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]
+///     ),
+///     [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false]
+/// )
+pub fn and_multibit_gate(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
+    [
+        and_gate(a[0], b[0]),
+        and_gate(a[1], b[1]),
+        and_gate(a[2], b[2]),
+        and_gate(a[3], b[3]),
+        and_gate(a[4], b[4]),
+        and_gate(a[5], b[5]),
+        and_gate(a[6], b[6]),
+        and_gate(a[7], b[7]),
+        and_gate(a[8], b[8]),
+        and_gate(a[9], b[9]),
+        and_gate(a[10], b[10]),
+        and_gate(a[11], b[11]),
+        and_gate(a[12], b[12]),
+        and_gate(a[13], b[13]),
+        and_gate(a[14], b[14]),
+        and_gate(a[15], b[15]),
+    ]
+}
+
+/// The divisive Demultiplexor gate. For output, if selector=0 then [input, 0] else [0, input]. 
+/// In words, put input in first or second position of output given the selector.
 ///
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{DemultiplexorGate, Gate};
-/// assert_eq!(DemultiplexorGate::calc([false, false]), [false, false]);
-/// assert_eq!(DemultiplexorGate::calc([true, false]), [true, false]);
-/// assert_eq!(DemultiplexorGate::calc([false, true]), [false, false]);
-/// assert_eq!(DemultiplexorGate::calc([true, true]), [false, true]);
+/// use rust_elements_computing_systems::gates::demultiplexor_gate;
+/// assert_eq!(demultiplexor_gate(false, false), [false, false]);
+/// assert_eq!(demultiplexor_gate(true, false), [true, false]);
+/// assert_eq!(demultiplexor_gate(false, true), [false, false]);
+/// assert_eq!(demultiplexor_gate(true, true), [false, true]);
 /// ```
 ///
-pub struct DemultiplexorGate;
-
-impl Gate for DemultiplexorGate {
-    type In = [bool; 2];
-    type Out = [bool; 2];
-
-    fn calc(input: Self::In) -> Self::Out {
-        [
-            MultiplexorGate::calc([input[0], false, input[1]]),
-            MultiplexorGate::calc([false, input[0], input[1]]),
-        ]
-    }
+pub fn demultiplexor_gate(a: bool, sel: bool) -> [bool; 2] {
+    [
+        multiplexor_gate(a, false, sel),
+        multiplexor_gate(false, a, sel),
+    ]
 }
+
 /// The quartering 4-Way 1-Bit Demultiplexor gate. Output is 4 bits, with input in
 /// first position if selector is 00, second position for 01, third position for 10,
 /// fourth position for 11. Unselected positions are always 0.
@@ -152,333 +157,136 @@ impl Gate for DemultiplexorGate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{Demultiplexor4Way1BitGate, Gate};
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((false, [false, false])), [false, false, false, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((false, [false, true])), [false, false, false, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((false, [true, false])), [false, false, false, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((false, [true, true])), [false, false, false, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((true, [false, false])), [true, false, false, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((true, [false, true])), [false, true, false, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((true, [true, false])), [false, false, true, false]);
-/// assert_eq!(Demultiplexor4Way1BitGate::calc((true, [true, true])), [false, false, false, true]);
+/// use rust_elements_computing_systems::gates::demultiplexor_4way_1bit_gate;
+/// assert_eq!(demultiplexor_4way_1bit_gate(false, [false, false]), [false, false, false, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(false, [false, true]), [false, false, false, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(false, [true, false]), [false, false, false, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(false, [true, true]), [false, false, false, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(true, [false, false]), [true, false, false, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(true, [false, true]), [false, true, false, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(true, [true, false]), [false, false, true, false]);
+/// assert_eq!(demultiplexor_4way_1bit_gate(true, [true, true]), [false, false, false, true]);
 /// ```
 ///
-pub struct Demultiplexor4Way1BitGate;
-
-impl Gate for Demultiplexor4Way1BitGate {
-    type In = (bool, [bool; 2]);
-    type Out = [bool; 4];
-
-    fn calc(input: Self::In) -> Self::Out {
-        let (ins, sel) = input;
-        [
-            MultiplexorGate::calc([ins, false, OrGate::calc([sel[0], sel[1]])]),
-            MultiplexorGate::calc([ins, false, OrGate::calc([sel[0], NotGate::calc(sel[1])])]),
-            MultiplexorGate::calc([ins, false, OrGate::calc([NotGate::calc(sel[0]), sel[1]])]),
-            MultiplexorGate::calc([false, ins, AndGate::calc([sel[0], sel[1]])]),
-        ]
-    }
+pub fn demultiplexor_4way_1bit_gate(a: bool, sel: [bool; 2]) -> [bool; 4] {
+    [
+        multiplexor_gate(a, false, or_gate(sel[0], sel[1])),
+        multiplexor_gate(a, false, or_gate(sel[0], not_gate(sel[1]))),
+        multiplexor_gate(a, false, or_gate(not_gate(sel[0]), sel[1])),
+        multiplexor_gate(false, a, and_gate(sel[0], sel[1])),
+    ]
 }
 
 /// The chopping 8-Way 1-Bit Demultiplexor gate. Output is 8 bits, with input in
 /// first position if selector is 000, second position for 001, third position for 010,
-/// fourth position for 011, fifth for 100, sixth for 101, seventh for 110, eighth for 
+/// fourth position for 011, fifth for 100, sixth for 101, seventh for 110, eighth for
 /// 111. Unselected positions are always 0.
 ///
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{Demultiplexor8Way1BitGate, Gate};
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [false, false, false])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [false, false, true])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [false, true, false])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [false, true, true])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [true, false, false])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [true, false, true])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [true, true, false])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((false, [true, true, true])), [false, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [false, false, false])), [true, false, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [false, false, true])), [false, true, false, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [false, true, false])), [false, false, true, false, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [false, true, true])), [false, false, false, true, false, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [true, false, false])), [false, false, false, false, true, false, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [true, false, true])), [false, false, false, false, false, true, false, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [true, true, false])), [false, false, false, false, false, false, true, false]);
-/// assert_eq!(Demultiplexor8Way1BitGate::calc((true, [true, true, true])), [false, false, false, false, false, false, false, true]);
+/// use rust_elements_computing_systems::gates::demultiplexor_8way_1bit_gate;
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, false, false]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, false, true]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, true, false]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, true, true]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [true, false, false]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [true, false, true]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [true, true, false]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(false, [true, true, true]), [false, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [false, false, false]), [true, false, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [false, false, true]), [false, true, false, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [false, true, false]), [false, false, true, false, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [false, true, true]), [false, false, false, true, false, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [true, false, false]), [false, false, false, false, true, false, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [true, false, true]), [false, false, false, false, false, true, false, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [true, true, false]), [false, false, false, false, false, false, true, false]);
+/// assert_eq!(demultiplexor_8way_1bit_gate(true, [true, true, true]), [false, false, false, false, false, false, false, true]);
 /// ```
 ///
-pub struct Demultiplexor8Way1BitGate;
-
-impl Gate for Demultiplexor8Way1BitGate {
-    type In = (bool, [bool; 3]);
-    type Out = [bool; 8];
-
-    fn calc(input: Self::In) -> Self::Out {
-        let (ins, sel) = input;
-        let left_four_bit = AndGate::calc([ins, NotGate::calc(sel[0])]);
-        let right_four_bit = AndGate::calc([ins, sel[0]]);
-        let left_four_solution = Demultiplexor4Way1BitGate::calc((left_four_bit, [sel[1], sel[2]]));
-        let right_four_solution = Demultiplexor4Way1BitGate::calc((right_four_bit, [sel[1], sel[2]]));
-        [
-            left_four_solution[0], 
-            left_four_solution[1], 
-            left_four_solution[2], 
-            left_four_solution[3], 
-            right_four_solution[0],
-            right_four_solution[1],
-            right_four_solution[2],
-            right_four_solution[3],
-        ]
-    }
+pub fn demultiplexor_8way_1bit_gate(a: bool, sel: [bool; 3]) -> [bool; 8]{
+    let left_four_bit = and_gate(a, not_gate(sel[0]));
+    let right_four_bit = and_gate(a, sel[0]);
+    let left_four_solution = demultiplexor_4way_1bit_gate(left_four_bit, [sel[1], sel[2]]);
+    let right_four_solution =
+        demultiplexor_4way_1bit_gate(right_four_bit, [sel[1], sel[2]]);
+    [
+        left_four_solution[0],
+        left_four_solution[1],
+        left_four_solution[2],
+        left_four_solution[3],
+        right_four_solution[0],
+        right_four_solution[1],
+        right_four_solution[2],
+        right_four_solution[3],
+    ]
 }
 
-/// The can-do-it-all Multi-Bit And gate
+/// The choosy Multiplexor gate. Selector at 0 selects first element and 1 the second element.
+///
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{MultiBitAndGate, Gate};
-/// assert_eq!(
-///     MultiBitAndGate::calc([
-///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
-///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]
-///     ]),
-///     [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false]
-/// )
-
-pub struct MultiBitAndGate;
-
-impl Gate for MultiBitAndGate {
-    type In = [[bool; 16]; 2];
-    type Out = [bool; 16];
-
-    fn calc(input: Self::In) -> Self::Out {
-        [
-            AndGate::calc([input[0][0], input[1][0]]),
-            AndGate::calc([input[0][1], input[1][1]]),
-            AndGate::calc([input[0][2], input[1][2]]),
-            AndGate::calc([input[0][3], input[1][3]]),
-            AndGate::calc([input[0][4], input[1][4]]),
-            AndGate::calc([input[0][5], input[1][5]]),
-            AndGate::calc([input[0][6], input[1][6]]),
-            AndGate::calc([input[0][7], input[1][7]]),
-            AndGate::calc([input[0][8], input[1][8]]),
-            AndGate::calc([input[0][9], input[1][9]]),
-            AndGate::calc([input[0][10], input[1][10]]),
-            AndGate::calc([input[0][11], input[1][11]]),
-            AndGate::calc([input[0][12], input[1][12]]),
-            AndGate::calc([input[0][13], input[1][13]]),
-            AndGate::calc([input[0][14], input[1][14]]),
-            AndGate::calc([input[0][15], input[1][15]]),
-        ]
-    }
+/// use rust_elements_computing_systems::gates::multiplexor_gate;
+/// assert_eq!(multiplexor_gate(false, false, false), false);
+/// assert_eq!(multiplexor_gate(false, true, false), false);
+/// assert_eq!(multiplexor_gate(true, false, false), true);
+/// assert_eq!(multiplexor_gate(true, true, false), true);
+/// assert_eq!(multiplexor_gate(false, false, true), false);
+/// assert_eq!(multiplexor_gate(false, true, true), true);
+/// assert_eq!(multiplexor_gate(true, false, true), false);
+/// assert_eq!(multiplexor_gate(true, true, true), true);
+/// ```
+///
+pub fn multiplexor_gate(a: bool, b: bool, sel: bool) -> bool {
+    let a_masked = and_gate(a, not_gate(sel));
+    let b_masked = and_gate(b, sel);
+    or_gate(a_masked, b_masked)
 }
 
-/// The all-the-choice-in-the-world Multi-Bit Multiplexor gate
+/// The all-the-choice-in-the-world Multi-Bit Multiplexor gate. Picks the first multi-bit array if selector 0,
+/// and the second if selector 1.
+///
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{MultiBitMultiplexorGate, Gate};
+/// use rust_elements_computing_systems::gates::multiplexor_multibit_gate;
 /// assert_eq!(
-///     MultiBitMultiplexorGate::calc((
+///     multiplexor_multibit_gate(
 ///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
 ///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
 ///         false
-///     )),
+///     ),
 ///     [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false]
 /// );
 ///
 /// assert_eq!(
-///     MultiBitMultiplexorGate::calc((
+///     multiplexor_multibit_gate(
 ///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
 ///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
 ///         true
-///     )),
+///     ),
 ///     [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]
 /// );
-pub struct MultiBitMultiplexorGate;
-
-impl Gate for MultiBitMultiplexorGate {
-    type In = ([bool; 16], [bool; 16], bool);
-    type Out = [bool; 16];
-
-    fn calc(input: Self::In) -> Self::Out {
-        let (a, b, sel) = input;
-        [
-            MultiplexorGate::calc([a[0], b[0], sel]),
-            MultiplexorGate::calc([a[1], b[1], sel]),
-            MultiplexorGate::calc([a[2], b[2], sel]),
-            MultiplexorGate::calc([a[3], b[3], sel]),
-            MultiplexorGate::calc([a[4], b[4], sel]),
-            MultiplexorGate::calc([a[5], b[5], sel]),
-            MultiplexorGate::calc([a[6], b[6], sel]),
-            MultiplexorGate::calc([a[7], b[7], sel]),
-            MultiplexorGate::calc([a[8], b[8], sel]),
-            MultiplexorGate::calc([a[9], b[9], sel]),
-            MultiplexorGate::calc([a[10], b[10], sel]),
-            MultiplexorGate::calc([a[11], b[11], sel]),
-            MultiplexorGate::calc([a[12], b[12], sel]),
-            MultiplexorGate::calc([a[13], b[13], sel]),
-            MultiplexorGate::calc([a[14], b[14], sel]),
-            MultiplexorGate::calc([a[15], b[15], sel]),
-        ]
-    }
-}
-
-/// The always cranky Multi-Bit Not gate
-/// # Examples
-///
-/// ```
-/// use rust_elements_computing_systems::gates::{MultiBitNotGate, Gate};
-/// assert_eq!(
-///     MultiBitNotGate::calc([true, false, true, true, false, false, true, false, true, true, true, false, false, false, true, false]),
-///     [false, true, false, false, true, true, false, true, false, false, false, true, true, true, false, true]
-/// )
-/// ```
-///
-
-pub struct MultiBitNotGate;
-
-impl Gate for MultiBitNotGate {
-    type In = [bool; 16];
-    type Out = [bool; 16];
-
-    fn calc(input: Self::In) -> Self::Out {
-        [
-            NotGate::calc(input[0]),
-            NotGate::calc(input[1]),
-            NotGate::calc(input[2]),
-            NotGate::calc(input[3]),
-            NotGate::calc(input[4]),
-            NotGate::calc(input[5]),
-            NotGate::calc(input[6]),
-            NotGate::calc(input[7]),
-            NotGate::calc(input[8]),
-            NotGate::calc(input[9]),
-            NotGate::calc(input[10]),
-            NotGate::calc(input[11]),
-            NotGate::calc(input[12]),
-            NotGate::calc(input[13]),
-            NotGate::calc(input[14]),
-            NotGate::calc(input[15]),
-        ]
-    }
-}
-
-/// The I-take-almost-anything Multi-Bit Or gate
-/// # Examples
-///
-/// ```
-/// use rust_elements_computing_systems::gates::{MultiBitOrGate, Gate};
-/// assert_eq!(
-///     MultiBitOrGate::calc([
-///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
-///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]
-///     ]),
-///     [true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false]
-/// )
-
-pub struct MultiBitOrGate;
-
-impl Gate for MultiBitOrGate {
-    type In = [[bool; 16]; 2];
-    type Out = [bool; 16];
-
-    fn calc(input: Self::In) -> Self::Out {
-        [
-            OrGate::calc([input[0][0], input[1][0]]),
-            OrGate::calc([input[0][1], input[1][1]]),
-            OrGate::calc([input[0][2], input[1][2]]),
-            OrGate::calc([input[0][3], input[1][3]]),
-            OrGate::calc([input[0][4], input[1][4]]),
-            OrGate::calc([input[0][5], input[1][5]]),
-            OrGate::calc([input[0][6], input[1][6]]),
-            OrGate::calc([input[0][7], input[1][7]]),
-            OrGate::calc([input[0][8], input[1][8]]),
-            OrGate::calc([input[0][9], input[1][9]]),
-            OrGate::calc([input[0][10], input[1][10]]),
-            OrGate::calc([input[0][11], input[1][11]]),
-            OrGate::calc([input[0][12], input[1][12]]),
-            OrGate::calc([input[0][13], input[1][13]]),
-            OrGate::calc([input[0][14], input[1][14]]),
-            OrGate::calc([input[0][15], input[1][15]]),
-        ]
-    }
-}
-
-/// The there-can-only-be-one Multi-Way Or gate
-/// # Examples
-///
-/// ```
-/// use rust_elements_computing_systems::gates::{MultiWayOrGate, Gate};
-/// assert_eq!(
-///     MultiWayOrGate::calc([false, false, false, false, false, false, false, false]),
-///     false
-/// );
-///
-/// assert_eq!(
-///     MultiWayOrGate::calc([true, false, false, false, false, false, false, false]),
-///     true
-/// );
-///
-/// assert_eq!(
-///     MultiWayOrGate::calc([false, false, false, false, false, false, false, true]),
-///     true
-/// );
-
-pub struct MultiWayOrGate;
-
-impl Gate for MultiWayOrGate {
-    type In = [bool; 8];
-    type Out = bool;
-
-    fn calc(input: Self::In) -> Self::Out {
-        OrGate::calc([
-            input[0],
-            OrGate::calc([
-                input[1],
-                OrGate::calc([
-                    input[2],
-                    OrGate::calc([
-                        input[3],
-                        OrGate::calc([
-                            input[4],
-                            OrGate::calc([input[5], OrGate::calc([input[6], input[7]])]),
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ])
-    }
-}
-
-/// The choosy Multiplexor gate. Last element is the selector, with 0 selecting first element
-/// and 1 the second element.
-///
-/// # Examples
-///
-/// ```
-/// use rust_elements_computing_systems::gates::{MultiplexorGate, Gate};
-/// assert_eq!(MultiplexorGate::calc([false, false, false]), false);
-/// assert_eq!(MultiplexorGate::calc([false, true, false]), false);
-/// assert_eq!(MultiplexorGate::calc([true, false, false]), true);
-/// assert_eq!(MultiplexorGate::calc([true, true, false]), true);
-/// assert_eq!(MultiplexorGate::calc([false, false, true]), false);
-/// assert_eq!(MultiplexorGate::calc([false, true, true]), true);
-/// assert_eq!(MultiplexorGate::calc([true, false, true]), false);
-/// assert_eq!(MultiplexorGate::calc([true, true, true]), true);
-/// ```
-///
-pub struct MultiplexorGate;
-
-impl Gate for MultiplexorGate {
-    type In = [bool; 3];
-    type Out = bool;
-
-    fn calc(input: Self::In) -> Self::Out {
-        let a_masked = AndGate::calc([input[0], NotGate::calc(input[2])]);
-        let b_masked = AndGate::calc([input[1], input[2]]);
-        OrGate::calc([a_masked, b_masked])
-    }
+pub fn multiplexor_multibit_gate(a: [bool; 16], b: [bool; 16], sel: bool) -> [bool; 16] {
+    [
+        multiplexor_gate(a[0], b[0], sel),
+        multiplexor_gate(a[1], b[1], sel),
+        multiplexor_gate(a[2], b[2], sel),
+        multiplexor_gate(a[3], b[3], sel),
+        multiplexor_gate(a[4], b[4], sel),
+        multiplexor_gate(a[5], b[5], sel),
+        multiplexor_gate(a[6], b[6], sel),
+        multiplexor_gate(a[7], b[7], sel),
+        multiplexor_gate(a[8], b[8], sel),
+        multiplexor_gate(a[9], b[9], sel),
+        multiplexor_gate(a[10], b[10], sel),
+        multiplexor_gate(a[11], b[11], sel),
+        multiplexor_gate(a[12], b[12], sel),
+        multiplexor_gate(a[13], b[13], sel),
+        multiplexor_gate(a[14], b[14], sel),
+        multiplexor_gate(a[15], b[15], sel),
+    ]
 }
 
 /// The complexly choosy 4-way 16-bit Multiplexor gate. 00 selector is first element, 01 second,
@@ -487,7 +295,7 @@ impl Gate for MultiplexorGate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{Multiplexor4Way16BitGate, Gate};
+/// use rust_elements_computing_systems::gates::multiplexor_4way_16bit_gate;
 /// let inputs = [
 ///     [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
 ///     [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
@@ -495,24 +303,15 @@ impl Gate for MultiplexorGate {
 ///     [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
 /// ];
 ///
-/// assert_eq!(Multiplexor4Way16BitGate::calc((inputs, [false, false])), inputs[0]);
-/// assert_eq!(Multiplexor4Way16BitGate::calc((inputs, [false, true])), inputs[1]);
-/// assert_eq!(Multiplexor4Way16BitGate::calc((inputs, [true, false])), inputs[2]);
-/// assert_eq!(Multiplexor4Way16BitGate::calc((inputs, [true, true])), inputs[3]);
+/// assert_eq!(multiplexor_4way_16bit_gate(inputs, [false, false]), inputs[0]);
+/// assert_eq!(multiplexor_4way_16bit_gate(inputs, [false, true]), inputs[1]);
+/// assert_eq!(multiplexor_4way_16bit_gate(inputs, [true, false]), inputs[2]);
+/// assert_eq!(multiplexor_4way_16bit_gate(inputs, [true, true]), inputs[3]);
 ///
-
-pub struct Multiplexor4Way16BitGate;
-
-impl Gate for Multiplexor4Way16BitGate {
-    type In = ([[bool; 16]; 4], [bool; 2]);
-    type Out = [bool; 16];
-
-    fn calc(input: Self::In) -> Self::Out {
-        let (ins, sel) = input;
-        let left_two_pick = MultiBitMultiplexorGate::calc((ins[0], ins[1], sel[1]));
-        let right_two_pick = MultiBitMultiplexorGate::calc((ins[2], ins[3], sel[1]));
-        MultiBitMultiplexorGate::calc((left_two_pick, right_two_pick, sel[0]))
-    }
+pub fn multiplexor_4way_16bit_gate(a: [[bool; 16]; 4], sel: [bool; 2]) -> [bool; 16] {
+    let left_two_pick = multiplexor_multibit_gate(a[0], a[1], sel[1]);
+    let right_two_pick = multiplexor_multibit_gate(a[2], a[3], sel[1]);
+    multiplexor_multibit_gate(left_two_pick, right_two_pick, sel[0])
 }
 
 /// The intricately choosy 8-way 16-bit Multiplexor gate. 000 selector is first element, 001 second,
@@ -521,7 +320,7 @@ impl Gate for Multiplexor4Way16BitGate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{Multiplexor8Way16BitGate, Gate};
+/// use rust_elements_computing_systems::gates::multiplexor_8way_16bit_gate;
 /// let inputs = [
 ///     [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
 ///     [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
@@ -533,30 +332,21 @@ impl Gate for Multiplexor4Way16BitGate {
 ///     [true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false],
 /// ];
 ///
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [false, false, false])), inputs[0]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [false, false, true])), inputs[1]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [false, true, false])), inputs[2]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [false, true, true])), inputs[3]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [true, false, false])), inputs[4]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [true, false, true])), inputs[5]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [true, true, false])), inputs[6]);
-/// assert_eq!(Multiplexor8Way16BitGate::calc((inputs, [true, true, true])), inputs[7]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [false, false, false]), inputs[0]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [false, false, true]), inputs[1]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [false, true, false]), inputs[2]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [false, true, true]), inputs[3]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [true, false, false]), inputs[4]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [true, false, true]), inputs[5]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [true, true, false]), inputs[6]);
+/// assert_eq!(multiplexor_8way_16bit_gate(inputs, [true, true, true]), inputs[7]);
 ///
-
-pub struct Multiplexor8Way16BitGate;
-
-impl Gate for Multiplexor8Way16BitGate {
-    type In = ([[bool; 16]; 8], [bool; 3]);
-    type Out = [bool; 16];
-
-    fn calc(input: Self::In) -> Self::Out {
-        let (ins, sel) = input;
-        let left_four_pick =
-            Multiplexor4Way16BitGate::calc(([ins[0], ins[1], ins[2], ins[3]], [sel[1], sel[2]]));
-        let right_four_pick =
-            Multiplexor4Way16BitGate::calc(([ins[4], ins[5], ins[6], ins[7]], [sel[1], sel[2]]));
-        MultiBitMultiplexorGate::calc((left_four_pick, right_four_pick, sel[0]))
-    }
+pub fn multiplexor_8way_16bit_gate(a: [[bool; 16]; 8], sel: [bool; 3]) -> [bool; 16] {
+    let left_four_pick =
+        multiplexor_4way_16bit_gate([a[0], a[1], a[2], a[3]], [sel[1], sel[2]]);
+    let right_four_pick =
+        multiplexor_4way_16bit_gate([a[4], a[5], a[6], a[7]], [sel[1], sel[2]]);
+    multiplexor_multibit_gate(left_four_pick, right_four_pick, sel[0])
 }
 
 /// The always contradictory Not gate
@@ -564,45 +354,133 @@ impl Gate for Multiplexor8Way16BitGate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{NotGate, Gate};
-/// assert_eq!(NotGate::calc(true), false);
-/// assert_eq!(NotGate::calc(false), true);
+/// use rust_elements_computing_systems::gates::not_gate;
+/// assert_eq!(not_gate(true), false);
+/// assert_eq!(not_gate(false), true);
 /// ```
 ///
-pub struct NotGate;
-
-impl Gate for NotGate {
-    type In = bool;
-    type Out = bool;
-
-    fn calc(input: Self::In) -> Self::Out {
-        NandGate::calc([true, input])
-    }
+pub fn not_gate(input: bool) -> bool {
+    nand_gate(true, input)
 }
+
+/// The always cranky Multi-Bit Not gate. NOT gate operation at each position.
+/// # Examples
+///
+/// ```
+/// use rust_elements_computing_systems::gates::not_multibit_gate;
+/// assert_eq!(
+///     not_multibit_gate([true, false, true, true, false, false, true, false, true, true, true, false, false, false, true, false]),
+///     [false, true, false, false, true, true, false, true, false, false, false, true, true, true, false, true]
+/// )
+/// ```
+///
+pub fn not_multibit_gate(a: [bool; 16]) -> [bool; 16] {
+    [
+        not_gate(a[0]),
+        not_gate(a[1]),
+        not_gate(a[2]),
+        not_gate(a[3]),
+        not_gate(a[4]),
+        not_gate(a[5]),
+        not_gate(a[6]),
+        not_gate(a[7]),
+        not_gate(a[8]),
+        not_gate(a[9]),
+        not_gate(a[10]),
+        not_gate(a[11]),
+        not_gate(a[12]),
+        not_gate(a[13]),
+        not_gate(a[14]),
+        not_gate(a[15]),
+    ]
+}
+
 
 /// The lovely Or gate
 ///
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{OrGate, Gate};
-/// assert_eq!(OrGate::calc([false, false]), false);
-/// assert_eq!(OrGate::calc([true, false]), true);
-/// assert_eq!(OrGate::calc([false, true]), true);
-/// assert_eq!(OrGate::calc([true, true]), true);
+/// use rust_elements_computing_systems::gates::or_gate;
+/// assert_eq!(or_gate(false, false), false);
+/// assert_eq!(or_gate(true, false), true);
+/// assert_eq!(or_gate(false, true), true);
+/// assert_eq!(or_gate(true, true), true);
 /// ```
 ///
-pub struct OrGate;
+pub fn or_gate(a: bool, b: bool) -> bool {
+    let x = not_gate(a);
+    let y = not_gate(b);
+    nand_gate(x, y)
+}
 
-impl Gate for OrGate {
-    type In = [bool; 2];
-    type Out = bool;
+/// The I-take-almost-anything Multi-Bit Or gate. OR gate operation at each position.
+/// # Examples
+///
+/// ```
+/// use rust_elements_computing_systems::gates::or_multibit_gate;
+/// assert_eq!(
+///     or_multibit_gate(
+///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
+///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]
+///     ),
+///     [true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false]
+/// )
+pub fn or_multibit_gate(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
+    [
+        or_gate(a[0], b[0]),
+        or_gate(a[1], b[1]),
+        or_gate(a[2], b[2]),
+        or_gate(a[3], b[3]),
+        or_gate(a[4], b[4]),
+        or_gate(a[5], b[5]),
+        or_gate(a[6], b[6]),
+        or_gate(a[7], b[7]),
+        or_gate(a[8], b[8]),
+        or_gate(a[9], b[9]),
+        or_gate(a[10], b[10]),
+        or_gate(a[11], b[11]),
+        or_gate(a[12], b[12]),
+        or_gate(a[13], b[13]),
+        or_gate(a[14], b[14]),
+        or_gate(a[15], b[15]),
+    ]
+}
 
-    fn calc(input: Self::In) -> Self::Out {
-        let a = NotGate::calc(input[0]);
-        let b = NotGate::calc(input[1]);
-        NandGate::calc([a, b])
-    }
+/// The there-can-only-be-one Multi-Way Or gate. Returns 1 if at least one input element is 1.
+/// Otherwise 0.
+/// # Examples
+///
+/// ```
+/// use rust_elements_computing_systems::gates::or_multiway_gate;
+/// assert_eq!(
+///     or_multiway_gate([false, false, false, false, false, false, false, false]),
+///     false
+/// );
+///
+/// assert_eq!(
+///     or_multiway_gate([true, false, false, false, false, false, false, false]),
+///     true
+/// );
+///
+/// assert_eq!(
+///     or_multiway_gate([false, false, false, false, false, false, false, true]),
+///     true
+/// );
+pub fn or_multiway_gate(a: [bool; 8]) -> bool {
+    or_gate(
+        a[0],
+        or_gate(
+            a[1],
+            or_gate(
+                a[2],
+                or_gate(
+                    a[3],
+                    or_gate(a[4], or_gate(a[5], or_gate(a[6], a[7]))),
+                ),
+            ),
+        ),
+    )
 }
 
 /// The always different XOr gate
@@ -610,23 +488,16 @@ impl Gate for OrGate {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::{XOrGate, Gate};
-/// assert_eq!(XOrGate::calc([false, false]), false);
-/// assert_eq!(XOrGate::calc([true, false]), true);
-/// assert_eq!(XOrGate::calc([false, true]), true);
-/// assert_eq!(XOrGate::calc([true, true]), false);
+/// use rust_elements_computing_systems::gates::xor_gate;
+/// assert_eq!(xor_gate(false, false), false);
+/// assert_eq!(xor_gate(true, false), true);
+/// assert_eq!(xor_gate(false, true), true);
+/// assert_eq!(xor_gate(true, true), false);
 /// ```
 ///
-pub struct XOrGate;
-
-impl Gate for XOrGate {
-    type In = [bool; 2];
-    type Out = bool;
-
-    fn calc(input: Self::In) -> Self::Out {
-        AndGate::calc([
-            OrGate::calc([input[0], input[1]]),
-            NandGate::calc([input[0], input[1]]),
-        ])
-    }
+pub fn xor_gate(a: bool, b: bool) -> bool {
+    and_gate(
+        or_gate(a, b),
+        nand_gate(a, b),
+    )
 }
