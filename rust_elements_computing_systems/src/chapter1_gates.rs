@@ -501,3 +501,40 @@ pub fn xor_gate(a: bool, b: bool) -> bool {
         nand_gate(a, b),
     )
 }
+
+/// The mysterious Multibit XOR gate. Does the XOR operation at each position.
+/// 
+/// This wasn't asked for in the book, but proved useful for Chapter 2. This gate makes it very easy
+/// to toggle a not gate but setting input bus to all 1s (if bus is all 0s, input won't be changed).
+/// 
+/// # Examples
+///
+/// ```
+/// use rust_elements_computing_systems::gates::xor_multibit_gate;
+/// assert_eq!(
+///     xor_multibit_gate(
+///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
+///         [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false]
+///     ),
+///     [false, true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, ]
+/// )
+pub fn xor_multibit_gate(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
+    [
+        xor_gate(a[0], b[0]),
+        xor_gate(a[1], b[1]),
+        xor_gate(a[2], b[2]),
+        xor_gate(a[3], b[3]),
+        xor_gate(a[4], b[4]),
+        xor_gate(a[5], b[5]),
+        xor_gate(a[6], b[6]),
+        xor_gate(a[7], b[7]),
+        xor_gate(a[8], b[8]),
+        xor_gate(a[9], b[9]),
+        xor_gate(a[10], b[10]),
+        xor_gate(a[11], b[11]),
+        xor_gate(a[12], b[12]),
+        xor_gate(a[13], b[13]),
+        xor_gate(a[14], b[14]),
+        xor_gate(a[15], b[15]),
+    ]
+}
