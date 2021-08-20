@@ -2,8 +2,11 @@
 pub mod chapter1_gates;
 pub mod chapter2_arithmetic;
 
+pub mod chapter3_sequenctial_logic;
+
 pub use chapter1_gates as gates;
 pub use chapter2_arithmetic as arithmetic;
+pub use chapter3_sequenctial_logic as seq_logic;
 
 /// Convenience function to get `bool` arrays for specific numbers.
 /// 

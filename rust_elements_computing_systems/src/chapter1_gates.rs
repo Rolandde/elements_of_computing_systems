@@ -4,6 +4,14 @@
 //! As `NAND` is magically given, the Rust bitwise operations are used to construct the gate. All other
 //! gates did not use any Rust logic at all (assignment were used for code readability). The gates were
 //! implemented in order given in the book, which made puzzling them out easier.
+//! 
+//! ## Notes on using `bool` for 0 (`false`) and 1 (`true`)
+//! `bool` works, but `[bool; 8]` takes up 8 times as much space as `u8` if I understand 
+//! [how much space types need](https://doc.rust-lang.org/core/mem/fn.size_of.html). I tried making u8
+//! work and the compiler would not let me. So this is why I like [bool; N]. Other reasons include:
+//! 
+//! * It's intuitive. A primitive type than can be in only two states. 
+//! * Length is explicit. `bool`, `[bool; 4]`, `[bool; 8]` cannot be directly compared
 //!
 //! ## NOT Gate
 //! If the first input of the NAND gate is `true`, then the second value will be flipped.
