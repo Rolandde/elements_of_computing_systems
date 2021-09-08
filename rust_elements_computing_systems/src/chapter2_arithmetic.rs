@@ -213,3 +213,44 @@ pub const ALU_Y_MINUS_X: [bool; 6] = [false, false, false, true, true, true];
 pub const ALU_X_AND_Y: [bool; 6] = [false, false, false, false, false, false];
 /// Returns OR(X, Y)
 pub const ALU_X_OR_Y: [bool; 6] = [false, true, false, true, false, true];
+
+#[cfg(test)]
+mod alu_tests {
+    use super::*;
+    use crate::from_i16;
+    #[test]
+    fn subtraction(){
+        assert_eq!(
+            alu(from_i16(100), from_i16(18), ALU_X_MINUS_Y),
+            (from_i16(82), false, false)
+        );
+
+        assert_eq!(
+            alu(from_i16(100), from_i16(18), ALU_Y_MINUS_X),
+            (from_i16(-82), false, true)
+        );
+
+        assert_eq!(
+            alu(from_i16(100), from_i16(-18), ALU_X_MINUS_Y),
+            (from_i16(118), false, false)
+        );
+    }
+
+    #[test]
+    fn negative() {
+        assert_eq!(
+            alu(from_i16(10000), from_i16(3999), ALU_X_MINUS),
+            (from_i16(-10000), false, true)
+        );
+
+        assert_eq!(
+            alu(from_i16(10000), from_i16(-3999), ALU_Y_MINUS),
+            (from_i16(3999), false, false)
+        );
+
+        assert_eq!(
+            alu(from_i16(10000), from_i16(0), ALU_Y_MINUS),
+            (from_i16(0), true, false)
+        );
+    }
+}
