@@ -7,9 +7,13 @@
 //!
 //! ## Notes on Cycles
 //! Sequential gates are controlled by a on (tick, 1) and off (tock, 0) clock. A cycle includes both a tick and a tock. A cycle start can be defined as either when the tick occurs or when the tock occurs. It is at the start of a cycle that sequential gates take their inputs and have valid outputs. At any other time, the output of sequential gates is indeterminate. All sequential gates are activated at the same time. If sequential gates are connected to each other, the inputs they get from each other was set at the start of the previous cycle. This allows a sequential gate to have as input its own output (can't be a direct connection though).
-//! 
+//!
 //! ## Note on state getter
-//! Initially, there was a `read()` method on each sequential gate that returned the current state of the gate. This was sequently removed as the `cycle` method itself could always be used to get the current state. For [Dff] gate, this was a little awkward (almost convinced me that a `read()` method was worth it), but for all other gates, the `cycle` method can be called with dummy input and the load bit set to 0 to get the state of the gate.
+//! Initially, there was a `read()` method on each sequential gate that returned the current state of the gate. This was removed as the `cycle()` method itself could always be used to get the current state. I backtracked on that yet again because
+//! * `cycle()` method requires `&mut` and it doesn't make sense to expect a gate to be mutable when it's only being read
+//! * chapter 5 has a read-only ROM chip that is independent of the clock (has no cycles), so a sequential gate must have a way to access it as a combinational gate
+//!
+//! The book calls this "probing" a sequential gate. The inputs are set to the desired values and the output is probed. For memory, this means setting the address input and probing for the value output at that address. As the cycle does not happen, the value input and load bit can be indeterminate.
 
 use crate::{arithmetic, gates};
 
@@ -27,6 +31,7 @@ use crate::{arithmetic, gates};
 /// assert_eq!(c, false);
 /// c = dff.cycle(true);
 /// assert_eq!(c, false);
+/// assert_eq!(dff.probe(), true);
 /// ```
 pub struct Dff {
     past_in: bool,
@@ -45,6 +50,10 @@ impl Dff {
         Dff { past_in: true }
     }
 
+    pub fn probe(&self) -> bool {
+        self.past_in
+    }
+
     pub fn cycle(&mut self, in_now: bool) -> bool {
         let past = self.past_in;
         self.past_in = in_now;
@@ -52,8 +61,7 @@ impl Dff {
     }
 }
 
-/// The memorable Bit. If `load` is set when cycle starts, the starting cycle will store the input
-/// of the previous cycle. If not, starting cycle output will be the output of the previous cycle.
+/// The memorable Bit. If `load` is set when cycle starts, the starting cycle will store the input of the previous cycle. If not, starting cycle output will be the output of the previous cycle.
 ///
 /// # Examples
 /// ```
@@ -65,6 +73,7 @@ impl Dff {
 /// assert_eq!(c, true);
 /// c = bit.cycle(false, false);
 /// assert_eq!(c, false);
+/// assert_eq!(bit.probe(), false);
 /// ```
 ///
 pub struct Bit {
@@ -90,12 +99,13 @@ impl Bit {
         }
     }
 
+    pub fn probe(&self) -> bool {
+        self.state.probe()
+    }
+
     pub fn cycle(&mut self, input: bool, load: bool) -> bool {
-        // Arbitrary input. Is discarded in the next `cycle` call.
-        let past = self.state.cycle(true);
-        let new = gates::multiplexor_gate(past, input, load);
-        self.state.cycle(new);
-        past
+        let new = gates::multiplexor_gate(self.probe(), input, load);
+        self.state.cycle(new)
     }
 }
 /// The prodigious Register. Same idea as Bit, except more bits.
@@ -114,6 +124,7 @@ impl Bit {
 /// assert_eq!(c, b);
 /// c = reg.cycle(a, true);
 /// assert_eq!(c, b);
+/// assert_eq!(reg.probe(), a);
 /// ```
 ///
 pub struct Register {
@@ -152,6 +163,27 @@ impl Register {
         Self::new([true; 16])
     }
 
+    pub fn probe(&self) -> [bool; 16] {
+        [
+            self.state[0].probe(),
+            self.state[1].probe(),
+            self.state[2].probe(),
+            self.state[3].probe(),
+            self.state[4].probe(),
+            self.state[5].probe(),
+            self.state[6].probe(),
+            self.state[7].probe(),
+            self.state[8].probe(),
+            self.state[9].probe(),
+            self.state[10].probe(),
+            self.state[11].probe(),
+            self.state[12].probe(),
+            self.state[13].probe(),
+            self.state[14].probe(),
+            self.state[15].probe(),
+        ]
+    }
+
     pub fn cycle(&mut self, input: [bool; 16], load: bool) -> [bool; 16] {
         [
             self.state[0].cycle(input[0], load),
@@ -188,6 +220,7 @@ impl Register {
 /// assert_eq!(c, from_i16(0));
 /// c = ram8.cycle(address, from_i16(0), true);
 /// assert_eq!(c, a);
+/// assert_eq!(ram8.probe(address), from_i16(0));
 /// ```
 ///
 pub struct Ram8 {
@@ -225,6 +258,20 @@ impl Ram8 {
         }
     }
 
+    pub fn probe(&self, address: [bool; 3]) -> [bool; 16] {
+        let probe = [
+            self.state[0].probe(),
+            self.state[1].probe(),
+            self.state[2].probe(),
+            self.state[3].probe(),
+            self.state[4].probe(),
+            self.state[5].probe(),
+            self.state[6].probe(),
+            self.state[7].probe(),
+        ];
+        gates::multiplexor_8way_16bit_gate(probe, address)
+    }
+
     pub fn cycle(&mut self, address: [bool; 3], input: [bool; 16], load: bool) -> [bool; 16] {
         let load_one_or_none = gates::demultiplexor_8way_1bit_gate(load, address);
         let cycle = [
@@ -255,6 +302,7 @@ impl Ram8 {
 /// assert_eq!(c, from_i16(0));
 /// c = ram.cycle(address, from_i16(0), true);
 /// assert_eq!(c, a);
+/// assert_eq!(ram.probe(address), from_i16(0));
 /// ```
 ///
 pub struct Ram64 {
@@ -292,6 +340,22 @@ impl Ram64 {
         }
     }
 
+    pub fn probe(&self, address: [bool; 6]) -> [bool; 16] {
+        let ram_self_probe = [address[0], address[1], address[2]];
+        let ram_8_probe = [address[3], address[4], address[5]];
+        let probe = [
+            self.state[0].probe(ram_8_probe),
+            self.state[1].probe(ram_8_probe),
+            self.state[2].probe(ram_8_probe),
+            self.state[3].probe(ram_8_probe),
+            self.state[4].probe(ram_8_probe),
+            self.state[5].probe(ram_8_probe),
+            self.state[6].probe(ram_8_probe),
+            self.state[7].probe(ram_8_probe),
+        ];
+        gates::multiplexor_8way_16bit_gate(probe, ram_self_probe)
+    }
+
     pub fn cycle(&mut self, address: [bool; 6], input: [bool; 16], load: bool) -> [bool; 16] {
         let ram_self_add = [address[0], address[1], address[2]];
         let ram_8_add = [address[3], address[4], address[5]];
@@ -324,6 +388,7 @@ impl Ram64 {
 /// assert_eq!(c, from_i16(0));
 /// c = ram.cycle(address, from_i16(0), true);
 /// assert_eq!(c, a);
+/// assert_eq!(ram.probe(address), from_i16(0));
 /// ```
 ///
 pub struct Ram512 {
@@ -361,6 +426,24 @@ impl Ram512 {
         }
     }
 
+    pub fn probe(&self, address: [bool; 9]) -> [bool; 16] {
+        let ram_self_probe = [address[0], address[1], address[2]];
+        let ram_64_probe = [
+            address[3], address[4], address[5], address[6], address[7], address[8],
+        ];
+        let probe = [
+            self.state[0].probe(ram_64_probe),
+            self.state[1].probe(ram_64_probe),
+            self.state[2].probe(ram_64_probe),
+            self.state[3].probe(ram_64_probe),
+            self.state[4].probe(ram_64_probe),
+            self.state[5].probe(ram_64_probe),
+            self.state[6].probe(ram_64_probe),
+            self.state[7].probe(ram_64_probe),
+        ];
+        gates::multiplexor_8way_16bit_gate(probe, ram_self_probe)
+    }
+
     pub fn cycle(&mut self, address: [bool; 9], input: [bool; 16], load: bool) -> [bool; 16] {
         let ram_self_add = [address[0], address[1], address[2]];
         let ram_64_add = [
@@ -395,6 +478,7 @@ impl Ram512 {
 /// assert_eq!(c, from_i16(0));
 /// c = ram.cycle(address, from_i16(0), true);
 /// assert_eq!(c, a);
+/// assert_eq!(ram.probe(address), from_i16(0));
 /// ```
 ///
 pub struct Ram4K {
@@ -430,6 +514,32 @@ impl Ram4K {
                 Ram512::new_1(),
             ],
         }
+    }
+
+    pub fn probe(&self, address: [bool; 12]) -> [bool; 16] {
+        let ram_self_probe = [address[0], address[1], address[2]];
+        let ram_512_probe = [
+            address[3],
+            address[4],
+            address[5],
+            address[6],
+            address[7],
+            address[8],
+            address[9],
+            address[10],
+            address[11],
+        ];
+        let probe = [
+            self.state[0].probe(ram_512_probe),
+            self.state[1].probe(ram_512_probe),
+            self.state[2].probe(ram_512_probe),
+            self.state[3].probe(ram_512_probe),
+            self.state[4].probe(ram_512_probe),
+            self.state[5].probe(ram_512_probe),
+            self.state[6].probe(ram_512_probe),
+            self.state[7].probe(ram_512_probe),
+        ];
+        gates::multiplexor_8way_16bit_gate(probe, ram_self_probe)
     }
 
     pub fn cycle(&mut self, address: [bool; 12], input: [bool; 16], load: bool) -> [bool; 16] {
@@ -474,6 +584,7 @@ impl Ram4K {
 /// assert_eq!(c, from_i16(0));
 /// c = ram.cycle(address, from_i16(0), true);
 /// assert_eq!(c, a);
+/// assert_eq!(ram.probe(address), from_i16(0));
 /// ```
 ///
 pub struct Ram16K {
@@ -501,6 +612,31 @@ impl Ram16K {
                 Ram4K::new_0(),
             ],
         }
+    }
+
+    pub fn probe(&mut self, address: [bool; 14]) -> [bool; 16] {
+        let ram_self_probe = [address[0], address[1]];
+        let ram_4k_probe = [
+            address[2],
+            address[3],
+            address[4],
+            address[5],
+            address[6],
+            address[7],
+            address[8],
+            address[9],
+            address[10],
+            address[11],
+            address[12],
+            address[13],
+        ];
+        let probe = [
+            self.state[0].probe(ram_4k_probe),
+            self.state[1].probe(ram_4k_probe),
+            self.state[2].probe(ram_4k_probe),
+            self.state[3].probe(ram_4k_probe),
+        ];
+        gates::multiplexor_4way_16bit_gate(probe, ram_self_probe)
     }
 
     pub fn cycle(&mut self, address: [bool; 14], input: [bool; 16], load: bool) -> [bool; 16] {
@@ -550,8 +686,9 @@ impl Ram16K {
 /// assert_eq!(n, from_i16(42));
 /// n = c.cycle(input, true, true, true);
 /// assert_eq!(n, from_i16(43));
-/// n = c.cycle(input, false, false, false);
+/// n = c.cycle(input, true, false, false);
 /// assert_eq!(n, from_i16(0));
+/// assert_eq!(c.probe(), from_i16(1));
 /// ```
 ///
 pub struct Counter {
@@ -565,11 +702,14 @@ impl Counter {
         }
     }
 
+    pub fn probe(&self) -> [bool; 16] {
+        self.count.probe()
+    }
+
     pub fn cycle(&mut self, input: [bool; 16], inc: bool, load: bool, reset: bool) -> [bool; 16] {
-        // Using cycle as a read function (dummy input as its not set);
-        let state = self.count.cycle([true; 16], false);
         // Not sure if efficient, as it's incremented regardless of the flag
-        let mut new = gates::multiplexor_multibit_gate(state, arithmetic::add_one(state), inc);
+        let mut new =
+            gates::multiplexor_multibit_gate(self.probe(), arithmetic::add_one(self.probe()), inc);
         new = gates::multiplexor_multibit_gate(new, input, load);
         new = gates::and_multibit_gate(new, [gates::not_gate(reset); 16]);
         self.count.cycle(new, true)
