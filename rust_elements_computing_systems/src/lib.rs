@@ -1,12 +1,13 @@
  #![no_std]
 pub mod chapter1_gates;
 pub mod chapter2_arithmetic;
-
 pub mod chapter3_sequenctial_logic;
+pub mod chapter5_computer_architecture;
 
 pub use chapter1_gates as gates;
 pub use chapter2_arithmetic as arithmetic;
 pub use chapter3_sequenctial_logic as seq_logic;
+pub use chapter5_computer_architecture as architecture;
 
 /// Convenience function to get `bool` arrays for specific numbers.
 /// 

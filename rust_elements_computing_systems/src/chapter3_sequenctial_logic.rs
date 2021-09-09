@@ -614,7 +614,7 @@ impl Ram16K {
         }
     }
 
-    pub fn probe(&mut self, address: [bool; 14]) -> [bool; 16] {
+    pub fn probe(&self, address: [bool; 14]) -> [bool; 16] {
         let ram_self_probe = [address[0], address[1]];
         let ram_4k_probe = [
             address[2],
