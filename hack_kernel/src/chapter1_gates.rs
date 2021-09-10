@@ -78,7 +78,7 @@
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::nand_gate;
+/// use hack_kernel::gates::nand_gate;
 /// assert_eq!(nand_gate(false, false), true);
 /// assert_eq!(nand_gate(true, false), true);
 /// assert_eq!(nand_gate(false, true), true);
@@ -94,7 +94,7 @@ pub fn nand_gate(a: bool, b: bool) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::and_gate;
+/// use hack_kernel::gates::and_gate;
 /// assert_eq!(and_gate(false, false), false);
 /// assert_eq!(and_gate(true, false), false);
 /// assert_eq!(and_gate(false, true), false);
@@ -109,7 +109,7 @@ pub fn and_gate(a: bool, b: bool) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::and_multibit_gate;
+/// use hack_kernel::gates::and_multibit_gate;
 /// assert_eq!(
 ///     and_multibit_gate(
 ///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
@@ -144,7 +144,7 @@ pub fn and_multibit_gate(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::demultiplexor_gate;
+/// use hack_kernel::gates::demultiplexor_gate;
 /// assert_eq!(demultiplexor_gate(false, false), [false, false]);
 /// assert_eq!(demultiplexor_gate(true, false), [true, false]);
 /// assert_eq!(demultiplexor_gate(false, true), [false, false]);
@@ -165,7 +165,7 @@ pub fn demultiplexor_gate(a: bool, sel: bool) -> [bool; 2] {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::demultiplexor_4way_1bit_gate;
+/// use hack_kernel::gates::demultiplexor_4way_1bit_gate;
 /// assert_eq!(demultiplexor_4way_1bit_gate(false, [false, false]), [false, false, false, false]);
 /// assert_eq!(demultiplexor_4way_1bit_gate(false, [false, true]), [false, false, false, false]);
 /// assert_eq!(demultiplexor_4way_1bit_gate(false, [true, false]), [false, false, false, false]);
@@ -193,7 +193,7 @@ pub fn demultiplexor_4way_1bit_gate(a: bool, sel: [bool; 2]) -> [bool; 4] {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::demultiplexor_8way_1bit_gate;
+/// use hack_kernel::gates::demultiplexor_8way_1bit_gate;
 /// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, false, false]), [false, false, false, false, false, false, false, false]);
 /// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, false, true]), [false, false, false, false, false, false, false, false]);
 /// assert_eq!(demultiplexor_8way_1bit_gate(false, [false, true, false]), [false, false, false, false, false, false, false, false]);
@@ -235,7 +235,7 @@ pub fn demultiplexor_8way_1bit_gate(a: bool, sel: [bool; 3]) -> [bool; 8]{
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::multiplexor_gate;
+/// use hack_kernel::gates::multiplexor_gate;
 /// assert_eq!(multiplexor_gate(false, false, false), false);
 /// assert_eq!(multiplexor_gate(false, true, false), false);
 /// assert_eq!(multiplexor_gate(true, false, false), true);
@@ -258,7 +258,7 @@ pub fn multiplexor_gate(a: bool, b: bool, sel: bool) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::multiplexor_multibit_gate;
+/// use hack_kernel::gates::multiplexor_multibit_gate;
 /// assert_eq!(
 ///     multiplexor_multibit_gate(
 ///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
@@ -303,7 +303,7 @@ pub fn multiplexor_multibit_gate(a: [bool; 16], b: [bool; 16], sel: bool) -> [bo
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::multiplexor_4way_16bit_gate;
+/// use hack_kernel::gates::multiplexor_4way_16bit_gate;
 /// let inputs = [
 ///     [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
 ///     [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
@@ -328,7 +328,7 @@ pub fn multiplexor_4way_16bit_gate(a: [[bool; 16]; 4], sel: [bool; 2]) -> [bool;
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::multiplexor_8way_16bit_gate;
+/// use hack_kernel::gates::multiplexor_8way_16bit_gate;
 /// let inputs = [
 ///     [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
 ///     [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
@@ -362,7 +362,7 @@ pub fn multiplexor_8way_16bit_gate(a: [[bool; 16]; 8], sel: [bool; 3]) -> [bool;
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::not_gate;
+/// use hack_kernel::gates::not_gate;
 /// assert_eq!(not_gate(true), false);
 /// assert_eq!(not_gate(false), true);
 /// ```
@@ -375,7 +375,7 @@ pub fn not_gate(input: bool) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::not_multibit_gate;
+/// use hack_kernel::gates::not_multibit_gate;
 /// assert_eq!(
 ///     not_multibit_gate([true, false, true, true, false, false, true, false, true, true, true, false, false, false, true, false]),
 ///     [false, true, false, false, true, true, false, true, false, false, false, true, true, true, false, true]
@@ -409,7 +409,7 @@ pub fn not_multibit_gate(a: [bool; 16]) -> [bool; 16] {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::or_gate;
+/// use hack_kernel::gates::or_gate;
 /// assert_eq!(or_gate(false, false), false);
 /// assert_eq!(or_gate(true, false), true);
 /// assert_eq!(or_gate(false, true), true);
@@ -426,7 +426,7 @@ pub fn or_gate(a: bool, b: bool) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::or_multibit_gate;
+/// use hack_kernel::gates::or_multibit_gate;
 /// assert_eq!(
 ///     or_multibit_gate(
 ///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],
@@ -460,7 +460,7 @@ pub fn or_multibit_gate(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::or_multiway_gate;
+/// use hack_kernel::gates::or_multiway_gate;
 /// assert_eq!(
 ///     or_multiway_gate([false, false, false, false, false, false, false, false]),
 ///     false
@@ -496,7 +496,7 @@ pub fn or_multiway_gate(a: [bool; 8]) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::xor_gate;
+/// use hack_kernel::gates::xor_gate;
 /// assert_eq!(xor_gate(false, false), false);
 /// assert_eq!(xor_gate(true, false), true);
 /// assert_eq!(xor_gate(false, true), true);
@@ -518,7 +518,7 @@ pub fn xor_gate(a: bool, b: bool) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rust_elements_computing_systems::gates::xor_multibit_gate;
+/// use hack_kernel::gates::xor_multibit_gate;
 /// assert_eq!(
 ///     xor_multibit_gate(
 ///         [true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false],

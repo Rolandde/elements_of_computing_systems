@@ -32,7 +32,7 @@ pub struct CPUOutput {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::architecture::CPU;
+/// use hack_kernel::architecture::CPU;
 /// let mut cpu = CPU::new();
 /// let mut inst = [
 ///     false,  // Set A register to 10
@@ -79,7 +79,7 @@ impl CPU {
     /// Run one cycle of the CPU
     ///
     /// Arguments:
-    /// * `in_m`: Value of M (content of RAM[A])
+    /// * `in_m`: Value of M (content of RAM\[A]\)
     /// * `instruction`: Machine instruction to execute
     /// * `reset`: If true, [CPUOutput::pc] will be set to 0. The program will go back to the beginning, regardless of instruction given.
     ///
@@ -270,6 +270,7 @@ pub struct Computer {
     cpu: CPU,
 }
 
+/// The final Hack computer.
 impl Computer {
     /// The ROM chip (that holds the instructions) needs to be given to the computer.
     ///
@@ -356,7 +357,7 @@ mod cpu_tests {
         assert_eq!(cpu.reg_d.cycle([false; 16], false), from_i16(-9876));
         assert_eq!(out.write_m, true);
         assert_eq!(out.out_m, from_i16(-9876));
-        assert_eq!(out.address_m, to_15_bit(from_i16(-9876)));
+        assert_eq!(out.address_m, to_15_bit(from_i16(9876)));
         assert_eq!(out.pc, to_15_bit(from_i16(2)));
     }
 

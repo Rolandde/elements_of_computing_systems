@@ -1,5 +1,5 @@
 [workspace]
 
 members = [
-    "rust_elements_computing_systems",
+    "hack_kernel",
 ]

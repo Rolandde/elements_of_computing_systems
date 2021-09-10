@@ -1,3 +1,6 @@
+//! The kernel implementation of the Hack [computer][architecture::Computer] described in The Elements of Computing Systems book.
+
+
  #![no_std]
 pub mod chapter1_gates;
 pub mod chapter2_arithmetic;
@@ -13,7 +16,7 @@ pub use chapter5_computer_architecture as architecture;
 /// 
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::from_i16;
+/// use hack_kernel::from_i16;
 /// assert_eq!(
 ///     from_i16(0),
 ///     [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]

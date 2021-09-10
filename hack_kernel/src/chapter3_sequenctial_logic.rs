@@ -21,7 +21,7 @@ use crate::{arithmetic, gates};
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::seq_logic::Dff;
+/// use hack_kernel::seq_logic::Dff;
 /// let mut dff = Dff::new(true);
 /// let mut c = dff.cycle(true);
 /// assert_eq!(c, true);
@@ -65,7 +65,7 @@ impl Dff {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::seq_logic::Bit;
+/// use hack_kernel::seq_logic::Bit;
 /// let mut bit = Bit::new(true);
 /// let mut c = bit.cycle(false, false);
 /// assert_eq!(c, true);
@@ -112,7 +112,7 @@ impl Bit {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Register};
+/// use hack_kernel::{from_i16, seq_logic::Register};
 /// let a = from_i16(22);
 /// let b = from_i16(42);
 /// let mut reg = Register::new(a);
@@ -210,7 +210,7 @@ impl Register {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Ram8};
+/// use hack_kernel::{from_i16, seq_logic::Ram8};
 /// let a = from_i16(22);
 /// let address = [true, false, true];
 /// let mut ram8 = Ram8::new_0();
@@ -292,7 +292,7 @@ impl Ram8 {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Ram64};
+/// use hack_kernel::{from_i16, seq_logic::Ram64};
 /// let a = from_i16(22);
 /// let address = [true, false, true, false, false, false];
 /// let mut ram = Ram64::new_0();
@@ -378,7 +378,7 @@ impl Ram64 {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Ram512};
+/// use hack_kernel::{from_i16, seq_logic::Ram512};
 /// let a = from_i16(22);
 /// let address = [true, false, true, false, false, false, true, false, true];
 /// let mut ram = Ram512::new_0();
@@ -468,7 +468,7 @@ impl Ram512 {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Ram4K};
+/// use hack_kernel::{from_i16, seq_logic::Ram4K};
 /// let a = from_i16(22);
 /// let address = [true, false, true, false, false, false, true, false, true, true, false, false];
 /// let mut ram = Ram4K::new_0();
@@ -574,7 +574,7 @@ impl Ram4K {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Ram16K};
+/// use hack_kernel::{from_i16, seq_logic::Ram16K};
 /// let a = from_i16(22);
 /// let address = [true, false, true, false, false, false, true, false, true, true, false, false, true, false];
 /// let mut ram = Ram16K::new_0();
@@ -673,7 +673,7 @@ impl Ram16K {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, seq_logic::Counter};
+/// use hack_kernel::{from_i16, seq_logic::Counter};
 /// let input = from_i16(42);
 /// let mut c = Counter::new();
 /// let mut n = c.cycle(input, false, false, false);

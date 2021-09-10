@@ -26,7 +26,7 @@
 //!
 //! # Examples
 //! ```
-//! use rust_elements_computing_systems::{from_i16, gates, arithmetic as alu};
+//! use hack_kernel::{from_i16, gates, arithmetic as alu};
 //! let x = from_i16(22);
 //! let y = from_i16(42);
 //!
@@ -76,7 +76,7 @@ use crate::gates;
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::arithmetic::half_adder;
+/// use hack_kernel::arithmetic::half_adder;
 /// assert_eq!(half_adder(false, false), [false, false]);
 /// assert_eq!(half_adder(false, true), [false, true]);
 /// assert_eq!(half_adder(true, false), [false, true]);
@@ -92,7 +92,7 @@ pub fn half_adder(a: bool, b: bool) -> [bool; 2] {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::arithmetic::full_adder;
+/// use hack_kernel::arithmetic::full_adder;
 /// assert_eq!(full_adder(false, false, false), [false, false]);
 /// assert_eq!(full_adder(false, false, true), [false, true]);
 /// assert_eq!(full_adder(false, true, false), [false, true]);
@@ -112,7 +112,7 @@ pub fn full_adder(a: bool, b: bool, c: bool) -> [bool; 2] {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, arithmetic::add};
+/// use hack_kernel::{from_i16, arithmetic::add};
 /// let ten = from_i16(10);
 /// let twenty = from_i16(20);
 /// let minus_ten = from_i16(-10);
@@ -138,7 +138,7 @@ pub fn add(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
 ///
 /// # Examples
 /// ```
-/// use rust_elements_computing_systems::{from_i16, arithmetic::add_one};
+/// use hack_kernel::{from_i16, arithmetic::add_one};
 /// assert_eq!(add_one(from_i16(42)), from_i16(43));
 /// assert_eq!(add_one(from_i16(-42)), from_i16(-41));
 ///
