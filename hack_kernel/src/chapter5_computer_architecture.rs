@@ -12,6 +12,7 @@ use crate::arithmetic;
 use crate::gates;
 use crate::seq_logic::{Counter, Ram16K, Register};
 
+
 /// Convenience container for CPU outputs.
 ///
 /// I could have used a tuple for purity, but having names is a lot easier.
@@ -198,25 +199,20 @@ impl Rom32KWriter {
 }
 
 /// The all-encompassing DataMemory, holding the RAM, Screen memory map, and Keyboard memory map.
-/// 
-/// ```
-/// use hack_kernel::architecture::DataMemory;
-/// DataMemory::new_0();
-/// ```
 pub struct DataMemory {
-    state: [Ram16K; 2],
+    state: alloc::vec::Vec<Ram16K>,
 }
 
 impl DataMemory {
     pub fn new_0() -> Self {
         Self {
-            state: [Ram16K::new_0(), Ram16K::new_0()],
+            state: alloc::vec![Ram16K::new_0(), Ram16K::new_0()],
         }
     }
 
     pub fn new_1() -> Self {
         Self {
-            state: [Ram16K::new_1(), Ram16K::new_1()],
+            state: alloc::vec![Ram16K::new_1(), Ram16K::new_1()],
         }
     }
 
@@ -399,5 +395,13 @@ mod cpu_tests {
         //Jump to 10 again, but this time reset is set, so should be 0
         out = cpu.cycle([false; 16], inst, true);
         assert_eq!(out.pc, to_15_bit(from_i16(0)));
+    }
+
+    #[test]
+    /// Initially, memory was held in arrays, which caused stack overflows (memory reached 4MB).
+    /// 
+    /// This test makes no assert statements and just checks for a stack overflow panic.
+    fn test_stack_overflow() {
+        let _x = DataMemory::new_0(); 
     }
 }

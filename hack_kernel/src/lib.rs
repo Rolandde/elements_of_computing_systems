@@ -1,6 +1,11 @@
 //! The kernel implementation of the Hack [computer][architecture::Computer] described in The Elements of Computing Systems book.
+//! 
+//! # Note on `no_std`
+//! The kernel does not depend on the Rust `std` library, but uses the `alloc` crate. This means the system using this needs to be able to allocate memory on the heap. Allocation was necessary as stack overflow errors happened with the memory. A 32K memory of 16 [Bit][crate::seq_logic::Bit] registers has 524288 [Bit][crate::seq_logic::Bit]s. Each Bit is a bool (1 byte), so the stack has to hold more than 4 megabytes. This crashes on my Windows 10 machine (curious how much stack Ubuntu provides).
 
 #![no_std]
+extern crate alloc;
+
 pub mod chapter1_gates;
 pub mod chapter2_arithmetic;
 pub mod chapter3_sequenctial_logic;

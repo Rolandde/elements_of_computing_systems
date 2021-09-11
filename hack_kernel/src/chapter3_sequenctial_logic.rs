@@ -224,13 +224,13 @@ impl Register {
 /// ```
 ///
 pub struct Ram8 {
-    state: [Register; 8],
+    state: alloc::vec::Vec<Register>,
 }
 
 impl Ram8 {
     pub fn new_0() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Register::new_0(),
                 Register::new_0(),
                 Register::new_0(),
@@ -245,7 +245,7 @@ impl Ram8 {
 
     pub fn new_1() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Register::new_1(),
                 Register::new_1(),
                 Register::new_1(),
@@ -306,13 +306,13 @@ impl Ram8 {
 /// ```
 ///
 pub struct Ram64 {
-    state: [Ram8; 8],
+    state: alloc::vec::Vec<Ram8>,
 }
 
 impl Ram64 {
     pub fn new_0() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram8::new_0(),
                 Ram8::new_0(),
                 Ram8::new_0(),
@@ -327,7 +327,7 @@ impl Ram64 {
 
     pub fn new_1() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram8::new_1(),
                 Ram8::new_1(),
                 Ram8::new_1(),
@@ -392,13 +392,13 @@ impl Ram64 {
 /// ```
 ///
 pub struct Ram512 {
-    state: [Ram64; 8],
+    state: alloc::vec::Vec<Ram64>,
 }
 
 impl Ram512 {
     pub fn new_0() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram64::new_0(),
                 Ram64::new_0(),
                 Ram64::new_0(),
@@ -413,7 +413,7 @@ impl Ram512 {
 
     pub fn new_1() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram64::new_1(),
                 Ram64::new_1(),
                 Ram64::new_1(),
@@ -482,13 +482,13 @@ impl Ram512 {
 /// ```
 ///
 pub struct Ram4K {
-    state: [Ram512; 8],
+    state: alloc::vec::Vec<Ram512>,
 }
 
 impl Ram4K {
     pub fn new_0() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram512::new_0(),
                 Ram512::new_0(),
                 Ram512::new_0(),
@@ -503,7 +503,7 @@ impl Ram4K {
 
     pub fn new_1() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram512::new_1(),
                 Ram512::new_1(),
                 Ram512::new_1(),
@@ -588,13 +588,13 @@ impl Ram4K {
 /// ```
 ///
 pub struct Ram16K {
-    state: [Ram4K; 4],
+    state: alloc::vec::Vec<Ram4K>,
 }
 
 impl Ram16K {
     pub fn new_0() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram4K::new_0(),
                 Ram4K::new_0(),
                 Ram4K::new_0(),
@@ -605,7 +605,7 @@ impl Ram16K {
 
     pub fn new_1() -> Self {
         Self {
-            state: [
+            state: alloc::vec![
                 Ram4K::new_1(),
                 Ram4K::new_1(),
                 Ram4K::new_1(),
