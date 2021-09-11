@@ -8,7 +8,7 @@
 //! 
 //! 
 
-use crate::arithmetic::alu;
+use crate::arithmetic;
 use crate::gates;
 use crate::seq_logic::{Counter, Ram16K, Register};
 
@@ -108,7 +108,7 @@ impl CPU {
         // The a bit determines if we are using value of A register or the value of the address it points to
         let alu_y = gates::multiplexor_multibit_gate(in_m, reg_a, a_bit);
 
-        let (calc, equal_0, less_0) = alu(reg_d, alu_y, c_bits);
+        let (calc, equal_0, less_0) = arithmetic::alu(reg_d, alu_y, c_bits);
         let greater_0 = gates::not_gate(less_0);
 
         self.reg_a.cycle(
@@ -176,17 +176,20 @@ impl Rom32K {
 ///
 pub struct Rom32KWriter {
     state: DataMemory,
+    pos: [bool; 16],
 }
 
 impl Rom32KWriter {
     pub fn new() -> Self {
         Self {
             state: DataMemory::new_0(),
+            pos: [false; 16],
         }
     }
 
-    pub fn write(&mut self, address: [bool; 15], input: [bool; 16]) {
-        self.state.cycle(address, input, true);
+    pub fn write_next(&mut self, input: [bool; 16]) {
+        self.state.cycle(to_15_bit(self.pos), input, true);
+        self.pos = arithmetic::add_one(self.pos);
     }
 
     pub fn create_rom(self) -> Rom32K {
@@ -195,6 +198,11 @@ impl Rom32KWriter {
 }
 
 /// The all-encompassing DataMemory, holding the RAM, Screen memory map, and Keyboard memory map.
+/// 
+/// ```
+/// use hack_kernel::architecture::DataMemory;
+/// DataMemory::new_0();
+/// ```
 pub struct DataMemory {
     state: [Ram16K; 2],
 }

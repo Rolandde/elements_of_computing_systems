@@ -608,8 +608,8 @@ impl Ram16K {
             state: [
                 Ram4K::new_1(),
                 Ram4K::new_1(),
-                Ram4K::new_0(),
-                Ram4K::new_0(),
+                Ram4K::new_1(),
+                Ram4K::new_1(),
             ],
         }
     }
