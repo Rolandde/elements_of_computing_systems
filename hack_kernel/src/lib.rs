@@ -56,4 +56,4 @@ pub fn from_i16(a: i16) -> [bool; 16] {
     ]
 }
 
-pub use architecture::{Computer, Rom32K, Rom32KWriter};
+pub use architecture::{Computer, Debugger, Rom32K, Rom32KWriter};

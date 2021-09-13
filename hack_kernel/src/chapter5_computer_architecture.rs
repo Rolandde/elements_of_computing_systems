@@ -6,7 +6,7 @@
 //! 
 //! The computer's [memory][DataMemory] supports standard data write and read, but also holds the memory representation of the screen and keyboard. The computer provides a [screen][Computer::screen] and a [keyboard][Computer::update_key] memory map that allow the mysterious outside world to interact with the computer. The implementation of the memory wasn't any different from the sequential gates seen in Chapter 3. One thing that took some thinking was that the memory is 32K, but not all of it is used by the CPU. My instinct was to add a panic in case that does happen, but decided to let it happen and pay in debugging time later.
 //! 
-//! 
+//! Once the [Computer] is created, it has very limited interfaces. It can be cycled (run the next instruction), look at the screen data map, or set the currently pressed key. A [Debugger] can be attached to the computer to expose all the internal states of the computer.
 
 use crate::arithmetic;
 use crate::gates;
@@ -43,7 +43,7 @@ pub struct CPUOutput {
 /// assert_eq!(out.write_m, false);
 ///
 /// inst = [
-///     true, true, true, true,  // C instruction that operates on value of A
+///     true, true, true, false,  // C instruction that operates on value of A
 ///     true, true, false, false, true, true,  // Computation gets -A
 ///     false, true, false,  // D register is set to computation
 ///     false, false, false,  // No jump     
@@ -52,7 +52,7 @@ pub struct CPUOutput {
 /// assert_eq!(out.write_m, false);
 ///
 /// inst = [
-///     true, true, true, true,  // C instruction that operates on value of A
+///     true, true, true, false,  // C instruction that operates on value of A
 ///     false, false, false, true, true, true,  // Computation gets A-D: 10 - (-10)
 ///     false, false, true,  // M register is set to computation
 ///     false, false, false,  // No jump     
@@ -87,8 +87,8 @@ impl CPU {
     pub fn cycle(&mut self, in_m: [bool; 16], instruction: [bool; 16], reset: bool) -> CPUOutput {
         // true if C instruction, otherwise A
         let c_instr = instruction[0];
-        // true if using A register value, otherwise M value
-        let a_bit = instruction[3];
+        // true if using M register value, otherwise A value
+        let m_bit = instruction[3];
         let c_bits = [
             instruction[4],
             instruction[5],
@@ -107,7 +107,7 @@ impl CPU {
         let reg_a = self.reg_a.probe();
         let reg_d = self.reg_d.probe();
         // The a bit determines if we are using value of A register or the value of the address it points to
-        let alu_y = gates::multiplexor_multibit_gate(in_m, reg_a, a_bit);
+        let alu_y = gates::multiplexor_multibit_gate(reg_a, in_m, m_bit);
 
         let (calc, equal_0, less_0) = arithmetic::alu(reg_d, alu_y, c_bits);
         let greater_0 = gates::not_gate(less_0);
@@ -166,7 +166,7 @@ pub struct Rom32K {
 }
 
 impl Rom32K {
-    pub fn read(&mut self, address: [bool; 15]) -> [bool; 16] {
+    pub fn read(&self, address: [bool; 15]) -> [bool; 16] {
         self.state.probe(address)
     }
 }
@@ -268,13 +268,22 @@ impl DataMemory {
     }
 }
 
+/// The final Hack computer.
+/// 
+/// # Examples
+/// ```
+/// use hack_kernel::architecture::{Computer, Rom32KWriter};
+/// let rom = Rom32KWriter::new().create_rom();
+/// let mut computer = Computer::new(rom);
+/// // Run the first instruction
+/// computer.cycle(false);
+/// ```
 pub struct Computer {
     data_memory: DataMemory,
     rom: Rom32K,
     cpu: CPU,
 }
 
-/// The final Hack computer.
 impl Computer {
     /// The ROM chip (that holds the instructions) needs to be given to the computer.
     ///
@@ -325,6 +334,51 @@ fn to_15_bit(i: [bool; 16]) -> [bool; 15] {
     ]
 }
 
+/// Look inside the [Computer]
+pub struct Debugger<'a> {
+    computer: &'a mut Computer
+}
+
+impl<'a> Debugger<'a> {
+    pub fn new(computer: &'a mut Computer) -> Self {
+        Self {computer}
+    }
+
+    /// Access to the public [Computer] interface
+    /// 
+    /// # Examples
+    /// ```
+    /// use hack_kernel::architecture::{Computer, Debugger, Rom32KWriter};
+    /// let rom = Rom32KWriter::new().create_rom();
+    /// let mut computer = Computer::new(rom);
+    /// let mut debugger = Debugger::new(&mut computer);
+    /// debugger.computer().cycle(false);
+    /// ```
+    pub fn computer(&mut self) -> &mut Computer {
+        self.computer
+    }
+
+    pub fn cpu_counter(&self) -> [bool; 16] {
+        self.computer.cpu.counter.probe()
+    }
+
+    pub fn cpu_register_a(&self) -> [bool; 16] {
+        self.computer.cpu.reg_a.probe()
+    }
+
+    pub fn cpu_register_d(&self) -> [bool; 16] {
+        self.computer.cpu.reg_d.probe()
+    }
+
+    pub fn memory(&self, address: [bool; 15]) -> [bool; 16] {
+        self.computer.data_memory.probe(address)
+    }
+
+    pub fn rom(&self, address: [bool; 15]) -> [bool; 16] {
+        self.computer.rom.read(address)
+    }
+}
+
 #[cfg(test)]
 mod cpu_tests {
     use super::*;
@@ -351,7 +405,7 @@ mod cpu_tests {
         // Positive number will start with 0 and be an instruction to set the A register to that
         cpu.cycle([false; 16], from_i16(9876), false);
         let inst = [
-            true, true, true, true, // C instruction that operates on value of A
+            true, true, true, false, // C instruction that operates on value of A
             true, true, false, false, true, true, // Computation gets -A
             true, true, true, // Set new value to all
             false, false, false, // No jump
@@ -375,7 +429,7 @@ mod cpu_tests {
         ];
         cpu.cycle([false; 16], inst, false);
         inst = [
-            true, true, true, true, // C instruction
+            true, true, true, false, // C instruction
             true, true, false, false, false, false, // Computation gets A
             false, false, false, // Don't assign to anything
             true, true, false, // Jump if less than or equal to 0 (so no jump)
@@ -384,7 +438,7 @@ mod cpu_tests {
         assert_eq!(out.pc, to_15_bit(from_i16(2)));
 
         inst = [
-            true, true, true, true, // C instruction
+            true, true, true, false, // C instruction
             true, true, false, false, false, false, // Computation gets A
             false, false, false, // Don't assign to anything
             false, false, true, // Jump as A is greater than 0 (jumps to whatever is in A)
