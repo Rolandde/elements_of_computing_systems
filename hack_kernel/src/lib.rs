@@ -16,7 +16,7 @@ pub use chapter2_arithmetic as arithmetic;
 pub use chapter3_sequenctial_logic as seq_logic;
 pub use chapter5_computer_architecture as architecture;
 
-/// Convenience function to get `bool` arrays for specific numbers.
+/// Convenience function to get `bool` arrays from specific numbers.
 ///
 /// # Examples
 /// ```
@@ -36,23 +36,68 @@ pub use chapter5_computer_architecture as architecture;
 /// ```
 ///
 pub fn from_i16(a: i16) -> [bool; 16] {
+    // 1 followed by 15 0s
+    let x: i16 = -32768;
     [
-        a < 0,
-        a & (i16::pow(2, 14)) != 0,
-        a & (i16::pow(2, 13)) != 0,
-        a & (i16::pow(2, 12)) != 0,
-        a & (i16::pow(2, 11)) != 0,
-        a & (i16::pow(2, 10)) != 0,
-        a & (i16::pow(2, 9)) != 0,
-        a & (i16::pow(2, 8)) != 0,
-        a & (i16::pow(2, 7)) != 0,
-        a & (i16::pow(2, 6)) != 0,
-        a & (i16::pow(2, 5)) != 0,
-        a & (i16::pow(2, 4)) != 0,
-        a & (i16::pow(2, 3)) != 0,
-        a & (i16::pow(2, 2)) != 0,
-        a & (i16::pow(2, 1)) != 0,
-        a & (i16::pow(2, 0)) != 0,
+        (a & x) != 0,
+        ((a << 1) & x) != 0,
+        ((a << 2) & x) != 0,
+        ((a << 3) & x) != 0,
+        ((a << 4) & x) != 0,
+        ((a << 5) & x) != 0,
+        ((a << 6) & x) != 0,
+        ((a << 7) & x) != 0,
+        ((a << 8) & x) != 0,
+        ((a << 9) & x) != 0,
+        ((a << 10) & x) != 0,
+        ((a << 11) & x) != 0,
+        ((a << 12) & x) != 0,
+        ((a << 13) & x) != 0,
+        ((a << 14) & x) != 0,
+        ((a << 15) & x) != 0,
+    ]
+}
+
+/// Convenience function to get 15 element bool array from a number.
+/// 
+/// `i16` has one extra bit of information. The most significant bit will be ignored. This means that input should be equal to or greater than 0.
+///
+/// # Examples
+/// ```
+/// use hack_kernel::from_i15;
+/// assert_eq!(
+///     from_i15(0),
+///     [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+/// );
+/// assert_eq!(
+///     from_i15(1),
+///     [false, false, false, false, false, false, false, false, false, false, false, false, false, false, true]
+/// );
+/// assert_eq!(
+///     from_i15(32767),
+///     [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]
+/// );
+/// ```
+///
+pub fn from_i15(a: i16) -> [bool; 15] {
+    // 1 followed by 15 0s
+    let x: i16 = -32768;
+    [
+        ((a << 1) & x) != 0,
+        ((a << 2) & x) != 0,
+        ((a << 3) & x) != 0,
+        ((a << 4) & x) != 0,
+        ((a << 5) & x) != 0,
+        ((a << 6) & x) != 0,
+        ((a << 7) & x) != 0,
+        ((a << 8) & x) != 0,
+        ((a << 9) & x) != 0,
+        ((a << 10) & x) != 0,
+        ((a << 11) & x) != 0,
+        ((a << 12) & x) != 0,
+        ((a << 13) & x) != 0,
+        ((a << 14) & x) != 0,
+        ((a << 15) & x) != 0,
     ]
 }
 

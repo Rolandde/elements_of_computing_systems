@@ -358,24 +358,28 @@ impl<'a> Debugger<'a> {
         self.computer
     }
 
-    pub fn cpu_counter(&self) -> [bool; 16] {
+    pub fn read_cpu_counter(&self) -> [bool; 16] {
         self.computer.cpu.counter.probe()
     }
 
-    pub fn cpu_register_a(&self) -> [bool; 16] {
+    pub fn read_cpu_register_a(&self) -> [bool; 16] {
         self.computer.cpu.reg_a.probe()
     }
 
-    pub fn cpu_register_d(&self) -> [bool; 16] {
+    pub fn read_cpu_register_d(&self) -> [bool; 16] {
         self.computer.cpu.reg_d.probe()
     }
 
-    pub fn memory(&self, address: [bool; 15]) -> [bool; 16] {
+    pub fn read_memory(&self, address: [bool; 15]) -> [bool; 16] {
         self.computer.data_memory.probe(address)
     }
 
-    pub fn rom(&self, address: [bool; 15]) -> [bool; 16] {
+    pub fn read_rom(&self, address: [bool; 15]) -> [bool; 16] {
         self.computer.rom.read(address)
+    }
+
+    pub fn write_memory(&mut self, address: [bool; 15], input: [bool; 16]) {
+        self.computer.data_memory.cycle(address, input, true);
     }
 }
 

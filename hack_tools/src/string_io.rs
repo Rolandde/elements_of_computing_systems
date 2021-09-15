@@ -32,14 +32,13 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// use hack_tools::string_io::Reader;
-    /// use hack_tools::Instruction;
     /// let hack = b"0110000011001010\n1100111101100000";
     /// let mut reader = Reader::new(&hack[..]);
     /// assert_eq!(reader.read_instruction().unwrap(), Some("0110000011001010".parse().unwrap()));
     /// assert_eq!(reader.read_instruction().unwrap(), Some("1100111101100000".parse().unwrap()));
     /// assert_eq!(reader.read_instruction().unwrap(), None);
     /// ```
-    pub fn read_instruction(&mut self) -> Result<Option<crate::Instruction>, crate::Error> {
+    pub fn read_instruction(&mut self) -> Result<Option<crate::Bit16>, crate::Error> {
         self.line_buffer.clear();
         let read = self.inner.read_line(&mut self.line_buffer)?;
 
@@ -47,7 +46,6 @@ impl<R: std::io::BufRead> Reader<R> {
             Ok(None)
         } else {
             let instruction_str = self.line_buffer.trim();
-            println!("{}", instruction_str);
             let instruction = instruction_str.parse()?;
             Ok(Some(instruction))
         }
@@ -58,7 +56,6 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// use hack_tools::string_io::Reader;
-    /// use hack_tools::Instruction;
     /// let hack = b"0110000011001010\n1100111101100000";
     /// let mut reader = Reader::new(&hack[..]);
     /// let mut iter = reader.instructions(); 
@@ -85,7 +82,7 @@ impl<'a, R: std::io::BufRead> Instructions<'a, R> {
 }
 
 impl<'a, R: std::io::BufRead> std::iter::Iterator for Instructions<'a, R> {
-    type Item = Result<crate::Instruction, crate::Error>;
+    type Item = Result<crate::Bit16, crate::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.read_instruction() {
