@@ -88,7 +88,9 @@ impl std::convert::From<[bool; 15]> for Bit15 {
 
 impl std::convert::From<i16> for Bit15 {
     fn from(i: i16) -> Self {
-        if i < 0 {panic!("input must be greater than 0")}
+        if i < 0 {
+            panic!("input must be greater than 0")
+        }
         Bit15::from(hack_kernel::from_i15(i))
     }
 }
@@ -171,5 +173,68 @@ impl<'a> Debugger<'a> {
     }
 }
 
+/// An iterator over the screen of the computer.
+///
+/// Starts at top left and goes left to right. (Like reading a book)
+pub struct Scan<'a> {
+    computer: &'a hack_kernel::Computer,
+    current_address: i16,
+    current_memory: std::vec::IntoIter<bool>,
+}
+
+impl<'a> Scan<'a> {
+    pub fn new(computer: &'a hack_kernel::Computer) -> Self {
+        let screen = computer.screen(Self::to_13bit(0)).to_vec();
+        Self {
+            computer,
+            current_address: 0,
+            current_memory: screen.into_iter(),
+        }
+    }
+
+    /// Only positive numbers (first bit is 0, and then ignore the next two bits)
+    fn to_13bit(i: i16) -> [bool; 13] {
+        let bit_15 = hack_kernel::from_i15(i);
+        [
+            bit_15[2], bit_15[3], bit_15[4], bit_15[5], bit_15[6], bit_15[7], bit_15[8], bit_15[9],
+            bit_15[10], bit_15[11], bit_15[12], bit_15[13], bit_15[14],
+        ]
+    }
+}
+
+impl<'a> std::iter::Iterator for Scan<'a> {
+    type Item = bool;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current_memory.next() {
+            Some(b) => Some(b),
+            None => {
+                self.current_address += 1;
+                if self.current_address < 8192 {
+                    self.current_memory =
+                        self.computer.screen(Self::to_13bit(self.current_address)).to_vec().into_iter();
+                    self.current_memory.next()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
 pub mod book_exercises;
 pub mod string_io;
+
+#[cfg(test)]
+mod cpu_tests {
+    use super::*;
+
+    #[test]
+    fn count_screen_pixels() {
+        let input = b"";
+        let rom = string_io::write_rom_from_buffer(&input[..]);
+        let c = hack_kernel::Computer::new(rom);
+        let scan = Scan::new(&c);
+        let pixel_count = scan.collect::<Vec<bool>>().len();
+        assert_eq!(pixel_count, 131072);
+    }
+}
