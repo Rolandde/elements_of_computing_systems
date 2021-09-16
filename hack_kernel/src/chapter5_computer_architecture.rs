@@ -3,15 +3,14 @@
 //! Putting it all together to create the hardware of a [Computer] (Chapter 5 of the book). Chapter 4 describes the machine language instructions that the CPU needs to support.
 //!
 //! The [CPU] was fun to write as the book showed a very good hint diagram on how all the sequential gates click together. The flags of the [ALU][crate::arithmetic::alu] match the instruction set of the CPU, reducing the problem to just dealing with updating the registers correctly and figuring out which instruction to jump to next.
-//! 
+//!
 //! The computer's [memory][DataMemory] supports standard data write and read, but also holds the memory representation of the screen and keyboard. The computer provides a [screen][Computer::screen] and a [keyboard][Computer::update_key] memory map that allow the mysterious outside world to interact with the computer. The implementation of the memory wasn't any different from the sequential gates seen in Chapter 3. One thing that took some thinking was that the memory is 32K, but not all of it is used by the CPU. My instinct was to add a panic in case that does happen, but decided to let it happen and pay in debugging time later.
-//! 
+//!
 //! Once the [Computer] is created, it has very limited interfaces. It can be cycled (run the next instruction), look at the screen data map, or set the currently pressed key. A [Debugger] can be attached to the computer to expose all the internal states of the computer.
 
 use crate::arithmetic;
 use crate::gates;
 use crate::seq_logic::{Counter, Ram16K, Register};
-
 
 /// Convenience container for CPU outputs.
 ///
@@ -162,7 +161,7 @@ impl CPU {
 /// This gate is read only, so once initialized there is no way to modify it. [Rom32KWriter] is used to create a ROM.
 ///
 pub struct Rom32K {
-    state: DataMemory,
+    state: CheatingDataMemory,
 }
 
 impl Rom32K {
@@ -176,14 +175,14 @@ impl Rom32K {
 /// [Rom32K] cannot be written to, which makes creating it difficult. Think of this as a machine that comes with an empty Rom32K chip (all 0s). While the Rom chip is attached to the writer, you can write to it. Once you remove it, the writer disgorges the Rom chip, which now and forever is read-only.
 ///
 pub struct Rom32KWriter {
-    state: DataMemory,
+    state: CheatingDataMemory,
     pos: [bool; 16],
 }
 
 impl Rom32KWriter {
     pub fn new() -> Self {
         Self {
-            state: DataMemory::new_0(),
+            state: CheatingDataMemory::new_0(),
             pos: [false; 16],
         }
     }
@@ -198,7 +197,9 @@ impl Rom32KWriter {
     }
 }
 
-/// The all-encompassing DataMemory, holding the RAM, Screen memory map, and Keyboard memory map.
+/// The very very slow DataMemory, holding the RAM, Screen memory map, and Keyboard memory map.
+/// 
+/// It takes >10s to scan through the screen memory map, so not used in [Computer]. See [crate] intro for details.
 pub struct DataMemory {
     state: alloc::vec::Vec<Ram16K>,
 }
@@ -268,8 +269,53 @@ impl DataMemory {
     }
 }
 
-/// The final Hack computer.
+/// The on-steroids memory. Used instead of [DataMemory].
 /// 
+/// It's fast because it breaks the rules of the game. See [crate] into for details.
+pub struct CheatingDataMemory {
+    state: alloc::vec::Vec<[bool; 16]>,
+}
+
+impl CheatingDataMemory {
+    pub fn new_0() -> Self {
+        Self {
+            state: alloc::vec![[false; 16]; 32768],
+        }
+    }
+
+    pub fn new_1() -> Self {
+        Self {
+            state: alloc::vec![[true; 16]; 32768],
+        }
+    }
+
+    fn address_to_index(address: [bool; 15]) -> usize {
+        address.iter().enumerate().fold(0_usize, |acc, (i, b)| {
+            if *b {
+                let exp = (14 - i) as u32;
+                acc + usize::pow(2_usize, exp)
+            } else {
+                acc
+            }
+        })
+    }
+
+    pub fn probe(&self, address: [bool; 15]) -> [bool; 16] {
+        self.state[Self::address_to_index(address)]
+    }
+
+    pub fn cycle(&mut self, address: [bool; 15], input: [bool; 16], load: bool) -> [bool; 16] {
+        let i = Self::address_to_index(address);
+        let current_val = self.state[i];
+        if load {
+            self.state[i] = input;
+        }
+        current_val
+    }
+}
+
+/// The final Hack computer.
+///
 /// # Examples
 /// ```
 /// use hack_kernel::architecture::{Computer, Rom32KWriter};
@@ -279,7 +325,7 @@ impl DataMemory {
 /// computer.cycle(false);
 /// ```
 pub struct Computer {
-    data_memory: DataMemory,
+    data_memory: CheatingDataMemory,
     rom: Rom32K,
     cpu: CPU,
 }
@@ -290,7 +336,7 @@ impl Computer {
     /// Think of this as inserting the game cartridge before turning the computer on.
     pub fn new(rom: Rom32K) -> Self {
         Self {
-            data_memory: DataMemory::new_0(),
+            data_memory: CheatingDataMemory::new_0(),
             rom,
             cpu: CPU::new(),
         }
@@ -300,20 +346,36 @@ impl Computer {
     pub fn screen(&self, address: [bool; 13]) -> [bool; 16] {
         // The address space for the screen is constant and reserved for it only
         let screen_addrs = [
-            true, false, address[0], address[1], address[2], address[3], address[4], address[5],
-            address[6], address[7], address[8], address[9], address[10], address[11], address[12],
+            true,
+            false,
+            address[0],
+            address[1],
+            address[2],
+            address[3],
+            address[4],
+            address[5],
+            address[6],
+            address[7],
+            address[8],
+            address[9],
+            address[10],
+            address[11],
+            address[12],
         ];
         self.data_memory.probe(screen_addrs)
     }
 
     /// Let the computer know which key is currently being pressed. If no key is pressed, this is set to 0.
     pub fn update_key(&mut self, key: [bool; 16]) {
-        let key_addrs = [true, true, false, false, false, false, false, false, false, false, false, false, false, false, false];
+        let key_addrs = [
+            true, true, false, false, false, false, false, false, false, false, false, false,
+            false, false, false,
+        ];
         self.data_memory.cycle(key_addrs, key, true);
     }
 
     /// Run one CPU cycle
-    /// 
+    ///
     /// If reset is set, the CPU will go back to instruction 0 for the next cycle
     pub fn cycle(&mut self, reset: bool) {
         let next_instr = self.cpu.counter.probe();
@@ -322,30 +384,31 @@ impl Computer {
         let m_value = self.data_memory.probe(to_15_bit(m_addrs));
 
         let out = self.cpu.cycle(m_value, instr, reset);
-        self.data_memory.cycle(out.address_m, out.out_m, out.write_m);
+        self.data_memory
+            .cycle(out.address_m, out.out_m, out.write_m);
     }
 }
 
 /// Memory is 16 bit, but most memory address space is 15 bit. This avoids annoying typing.
 fn to_15_bit(i: [bool; 16]) -> [bool; 15] {
     [
-        i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11], i[12], i[13],
-        i[14], i[15],
+        i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11], i[12], i[13], i[14],
+        i[15],
     ]
 }
 
 /// Look inside the [Computer]
 pub struct Debugger<'a> {
-    computer: &'a mut Computer
+    computer: &'a mut Computer,
 }
 
 impl<'a> Debugger<'a> {
     pub fn new(computer: &'a mut Computer) -> Self {
-        Self {computer}
+        Self { computer }
     }
 
     /// Access to the public [Computer] interface
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_kernel::architecture::{Computer, Debugger, Rom32KWriter};
@@ -457,9 +520,9 @@ mod cpu_tests {
 
     #[test]
     /// Initially, memory was held in arrays, which caused stack overflows (memory reached 4MB).
-    /// 
+    ///
     /// This test makes no assert statements and just checks for a stack overflow panic.
     fn test_stack_overflow() {
-        let _x = DataMemory::new_0(); 
+        let _x = DataMemory::new_0();
     }
 }
