@@ -24,7 +24,7 @@ impl std::str::FromStr for Bit16 {
     fn from_str(instruction: &str) -> Result<Self, Self::Err> {
         let mut r = [false; 16];
         if instruction.len() != 16 {
-            Err(Error::CharCount(instruction.len()))?
+            Err(Error::CharCount(16))?
         }
         for (i, c) in instruction.chars().enumerate() {
             match c {
@@ -52,9 +52,17 @@ impl std::convert::From<i16> for Bit16 {
     }
 }
 
+impl std::fmt::Display for Bit16 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let x: String = self.i.iter().map(|&b| if b { '1' } else { '0' }).collect();
+        write!(f, "{}", x)
+    }
+}
+
 /// A big endian 15 bit abstraction for the hack computer.
 ///
 /// Used for memory address.
+#[derive(Debug, Eq, PartialEq)]
 pub struct Bit15 {
     i: [bool; 15],
 }
@@ -64,7 +72,7 @@ impl std::str::FromStr for Bit15 {
     fn from_str(instruction: &str) -> Result<Self, Self::Err> {
         let mut r = [false; 15];
         if instruction.len() != 15 {
-            Err(Error::CharCount(instruction.len()))?
+            Err(Error::CharCount(15))?
         }
         for (i, c) in instruction.chars().enumerate() {
             match c {
@@ -95,27 +103,85 @@ impl std::convert::From<i16> for Bit15 {
     }
 }
 
+impl std::fmt::Display for Bit15 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let x: String = self.i.iter().map(|&b| if b { '1' } else { '0' }).collect();
+        write!(f, "{}", x)
+    }
+}
+
+/// The A-command in the hack assembly language.
+/// 
+/// It can come in two versions: an address or a symbol that refers to a previously defined address.
+///
+/// # Examples
+/// ```
+/// use std::str::FromStr;
+/// assert_eq!(
+///     hack_tools::AssemblyACommand::from_str("@hello").unwrap(),
+///     hack_tools::AssemblyACommand::Symbol("hello".to_string())
+/// );
+/// assert_eq!(
+///     hack_tools::AssemblyACommand::from_str("@100100101101000").unwrap(),
+///     hack_tools::AssemblyACommand::Address("100100101101000".parse().unwrap())
+/// );
+/// ```
+#[derive(Debug, PartialEq, Eq)]
+pub enum AssemblyACommand {
+    Address(Bit15),
+    Symbol(String),
+}
+
+impl std::str::FromStr for AssemblyACommand {
+    type Err = Error;
+    fn from_str(a: &str) -> Result<Self, Self::Err> {
+        let first = a.chars().next().ok_or(Error::AssemblyACommand)?;
+        if first != '@' {
+            Err(Error::AssemblyACommand)
+        } else {
+            let s = a.get(1..).ok_or(Error::AssemblyACommand)?;
+            if s.starts_with(|c: char| c.is_digit(10)) {
+                Ok(Self::Address(Bit15::from_str(s)?))
+            } else {
+                Ok(Self::Symbol(s.to_string()))
+            }
+        }
+    }
+}
+
 /// Errors during parsing
 #[derive(Debug)]
 pub enum Error {
-    /// Each line is expected to be 16 characters
+    /// An A-command is expected to begin with an `@` character.
+    AssemblyACommand,
+    /// One more characters between `(` and `)` followed by a command
+    AssemblyLabel(i16),
+    /// String input is the wrong length, with expected length specified.
     CharCount(usize),
     /// Character can either be `0` or `1`. Offset of invalid character is also recorded.
     Char(char, usize),
-    /// Upstream IO error
+    /// Upstream IO error.
     Io(std::io::Error),
+    /// Duplicated symbol
+    SymbolTable(i16),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CharCount(i) => write!(f, "expected 16 characters, but got {}", i),
+            Self::AssemblyACommand => write!(
+                f,
+                "a-command is at least 2 characters long, starting with `@`"
+            ),
+            Self::AssemblyLabel(line) => write!(f, "invalid label on line {}", line),
+            Self::CharCount(i) => write!(f, "input must be {} character(s)", i),
             Self::Char(c, i) => write!(
                 f,
                 "expected either 0 or 1 character, but got {} at offset {}",
                 c, i
             ),
             Self::Io(e) => write!(f, "cannot read: {}", e),
+            Self::SymbolTable(line) => write!(f, "duplicated symbol on line {}", line),
         }
     }
 }
@@ -123,9 +189,12 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::AssemblyACommand => None,
+            Self::AssemblyLabel(_) => None,
             Self::Char(_, _) => None,
             Self::CharCount(_) => None,
             Self::Io(e) => Some(e),
+            Self::SymbolTable(_) => None,
         }
     }
 }
@@ -210,8 +279,11 @@ impl<'a> std::iter::Iterator for Scan<'a> {
             None => {
                 self.current_address += 1;
                 if self.current_address < 8192 {
-                    self.current_memory =
-                        self.computer.screen(Self::to_13bit(self.current_address)).to_vec().into_iter();
+                    self.current_memory = self
+                        .computer
+                        .screen(Self::to_13bit(self.current_address))
+                        .to_vec()
+                        .into_iter();
                     self.current_memory.next()
                 } else {
                     None
@@ -221,8 +293,10 @@ impl<'a> std::iter::Iterator for Scan<'a> {
     }
 }
 
+pub mod assembly;
+pub mod assembly_io;
 pub mod book_exercises;
-pub mod string_io;
+pub mod hack_io;
 
 #[cfg(test)]
 mod cpu_tests {
@@ -231,7 +305,7 @@ mod cpu_tests {
     #[test]
     fn count_screen_pixels() {
         let input = b"";
-        let rom = string_io::write_rom_from_buffer(&input[..]);
+        let rom = hack_io::write_rom_from_buffer(&input[..]);
         let c = hack_kernel::Computer::new(rom);
         let scan = Scan::new(&c);
         let pixel_count = scan.collect::<Vec<bool>>().len();

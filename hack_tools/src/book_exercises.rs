@@ -21,7 +21,7 @@ pub fn chapter5_add() -> Bit16 {
         1110000010010000
         0000000000000000
         1110001100001000";
-    let rom = crate::string_io::write_rom_from_buffer(INSTRUCTIONS.as_bytes());
+    let rom = crate::hack_io::write_rom_from_buffer(INSTRUCTIONS.as_bytes());
     let mut computer = hack_kernel::Computer::new(rom);
     for _ in 0..6 {
         computer.cycle(false);
@@ -59,7 +59,7 @@ pub fn chapter5_max(a: Bit16, b: Bit16) -> Bit16 {
     1110001100001000
     0000000000001110
     1110101010000111";
-    let rom = crate::string_io::write_rom_from_buffer(INSTRUCTIONS.as_bytes());
+    let rom = crate::hack_io::write_rom_from_buffer(INSTRUCTIONS.as_bytes());
     let mut computer = hack_kernel::Computer::new(rom);
     let mut debugger = Debugger::new(&mut computer);
     debugger.write_memory(Bit15::from(0), a);

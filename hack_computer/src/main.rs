@@ -9,7 +9,7 @@ fn main() {
     let mut args =  std::env::args();
     args.next(); // Program name
     let file = args.next().expect("No file specified");
-    let rom = hack_tools::string_io::write_rom_from_file(file);
+    let rom = hack_tools::hack_io::write_rom_from_file(file);
     let mut comp = hack_kernel::Computer::new(rom);
     let mut debug = hack_tools::Debugger::new(&mut comp);
     debug.write_memory(0.into(), 10.into());
