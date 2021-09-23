@@ -28,7 +28,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// Reads the next instruction
     ///
     /// If End of File has been reached, returns `None`
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_tools::hack_io::Reader;
@@ -52,13 +52,13 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 
     /// Returns iterator over the instructions in a file.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_tools::hack_io::Reader;
     /// let hack = b"0110000011001010\n1100111101100000";
     /// let mut reader = Reader::new(&hack[..]);
-    /// let mut iter = reader.instructions(); 
+    /// let mut iter = reader.instructions();
     /// assert_eq!(iter.next().transpose().unwrap(), Some("0110000011001010".parse().unwrap()));
     /// assert_eq!(iter.next().transpose().unwrap(), Some("1100111101100000".parse().unwrap()));
     /// assert_eq!(iter.next().transpose().unwrap(), None);
@@ -106,19 +106,19 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for Instructions<'a, R> {
 /// ```
 /// # Panics
 /// On invalid instruction format. A hack computer cannot run without valid instructions, so there is no point dealing with errors. If one game cartridge won't load, but all your other games work, you either return the game cartridge or have really steady hands.
-/// 
+///
 pub fn write_rom_from_buffer(buf: impl std::io::BufRead) -> hack_kernel::Rom32K {
     let mut writer = hack_kernel::Rom32KWriter::new();
     let mut reader = Reader::new(buf);
     for (i, instruction) in reader.instructions().enumerate() {
-        let inst = instruction.unwrap_or_else(|e| panic!("Failed on line {}: {}", i+1, e));
+        let inst = instruction.unwrap_or_else(|e| panic!("Failed on line {}: {}", i + 1, e));
         writer.write_next(inst.i);
     }
     writer.create_rom()
 }
 
 /// Create a ROM from a `.hack` file
-/// 
+///
 /// # Examples
 /// ```
 /// use hack_tools::hack_io::write_rom_from_file;
@@ -130,13 +130,11 @@ pub fn write_rom_from_buffer(buf: impl std::io::BufRead) -> hack_kernel::Rom32K 
 /// let mut c = Computer::new(rom);
 /// c.cycle(false);
 /// ```
-/// 
+///
 /// # Panics
 /// See panic note for [write_rom_from_buffer]
-/// 
-pub fn write_rom_from_file<P: AsRef<std::path::Path>>(
-    path: P,
-) -> hack_kernel::Rom32K {
+///
+pub fn write_rom_from_file<P: AsRef<std::path::Path>>(path: P) -> hack_kernel::Rom32K {
     let f = std::fs::File::open(path).unwrap_or_else(|e| panic!("Cannot open file: {}", e));
     write_rom_from_buffer(std::io::BufReader::new(f))
 }

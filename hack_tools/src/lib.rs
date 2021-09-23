@@ -110,52 +110,15 @@ impl std::fmt::Display for Bit15 {
     }
 }
 
-/// The A-command in the hack assembly language.
-/// 
-/// It can come in two versions: an address or a symbol that refers to a previously defined address.
-///
-/// # Examples
-/// ```
-/// use std::str::FromStr;
-/// assert_eq!(
-///     hack_tools::AssemblyACommand::from_str("@hello").unwrap(),
-///     hack_tools::AssemblyACommand::Symbol("hello".to_string())
-/// );
-/// assert_eq!(
-///     hack_tools::AssemblyACommand::from_str("@100100101101000").unwrap(),
-///     hack_tools::AssemblyACommand::Address("100100101101000".parse().unwrap())
-/// );
-/// ```
-#[derive(Debug, PartialEq, Eq)]
-pub enum AssemblyACommand {
-    Address(Bit15),
-    Symbol(String),
-}
-
-impl std::str::FromStr for AssemblyACommand {
-    type Err = Error;
-    fn from_str(a: &str) -> Result<Self, Self::Err> {
-        let first = a.chars().next().ok_or(Error::AssemblyACommand)?;
-        if first != '@' {
-            Err(Error::AssemblyACommand)
-        } else {
-            let s = a.get(1..).ok_or(Error::AssemblyACommand)?;
-            if s.starts_with(|c: char| c.is_digit(10)) {
-                Ok(Self::Address(Bit15::from_str(s)?))
-            } else {
-                Ok(Self::Symbol(s.to_string()))
-            }
-        }
-    }
-}
-
 /// Errors during parsing
 #[derive(Debug)]
 pub enum Error {
-    /// An A-command is expected to begin with an `@` character.
-    AssemblyACommand,
+    /// An A-command is expected to begin with an `@` character and be an address or valid symbol.
+    ACommand(i16),
     /// One more characters between `(` and `)` followed by a command
     AssemblyLabel(i16),
+    /// The C-command is dest=comp;jump, with dest and jump being optional
+    CCommand(i16),
     /// String input is the wrong length, with expected length specified.
     CharCount(usize),
     /// Character can either be `0` or `1`. Offset of invalid character is also recorded.
@@ -169,11 +132,9 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AssemblyACommand => write!(
-                f,
-                "a-command is at least 2 characters long, starting with `@`"
-            ),
+            Self::ACommand(line) => write!(f, "invalid a-command on line {}", line),
             Self::AssemblyLabel(line) => write!(f, "invalid label on line {}", line),
+            Self::CCommand(line) => write!(f, "invalid c-command on line {}", line),
             Self::CharCount(i) => write!(f, "input must be {} character(s)", i),
             Self::Char(c, i) => write!(
                 f,
@@ -189,8 +150,9 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::AssemblyACommand => None,
+            Self::ACommand(_) => None,
             Self::AssemblyLabel(_) => None,
+            Self::CCommand(_) => None,
             Self::Char(_, _) => None,
             Self::CharCount(_) => None,
             Self::Io(e) => Some(e),

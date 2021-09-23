@@ -32,7 +32,7 @@ pub fn chapter5_add() -> Bit16 {
 /// Write the max number to RAM\[2\], with the two input numbers at RAM\[0\] and RAM\[1\]
 ///
 /// The hack machine code was given to test that the computer functions properly.
-/// 
+///
 /// # Solution
 /// ```
 /// use hack_tools::book_exercises::*;
@@ -64,7 +64,7 @@ pub fn chapter5_max(a: Bit16, b: Bit16) -> Bit16 {
     let mut debugger = Debugger::new(&mut computer);
     debugger.write_memory(Bit15::from(0), a);
     debugger.write_memory(Bit15::from(1), b);
-    // Machine code loops infinitely from the last line 
+    // Machine code loops infinitely from the last line
     while debugger.read_cpu_counter() != Bit16::from(15) {
         debugger.computer().cycle(false)
     }
