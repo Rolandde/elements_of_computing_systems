@@ -1,4 +1,29 @@
 //! Assembler that converts from `.asm` assembly format to `.hack` machine instructions format.
+//! 
+//! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
+//! 
+//! # Examples
+//! ```
+//! let asm = b"
+//! // This keeps adding 1 to the RAM address 16 forever.
+//! (FOREVER)
+//! @i
+//! M=M+1
+//! @FOREVER
+//! 0;JMP
+//! ";
+//! let symbol_table = hack_tools::assembly::FirstPass::new_symbol_table(&asm[..])?;
+//! let machine_code: Vec<hack_tools::Bit16> = hack_tools::assembly::SecondPass::new(
+//!     &asm[..], symbol_table
+//!     // Neat way of converting `Vec<Result>` to `Result<Vec>`
+//!     ).collect::<Result<Vec<_>, _>>()?;
+//! assert_eq!(machine_code.len(), 4);
+//! assert_eq!(machine_code[0], 16.into());
+//! assert_eq!(machine_code[1], "1111110111001000".parse()?);
+//! assert_eq!(machine_code[2], 0.into());
+//! assert_eq!(machine_code[3], "1110101010000111".parse()?);
+//! # Ok::<(), hack_tools::Error>(())
+//! ```
 
 /// An iterator over the assembly labels and the commands they point to.
 ///
@@ -9,6 +34,7 @@ pub struct FirstPass<R> {
 }
 
 impl<R: std::io::BufRead> FirstPass<R> {
+    /// Creates the iterator
     pub fn new(buffer: R) -> Self {
         Self {
             inner: crate::assembly_io::Reader::new(buffer),
@@ -16,18 +42,19 @@ impl<R: std::io::BufRead> FirstPass<R> {
         }
     }
 
-    /// Consumes the iterator and converts it into [SymbolTable].
+    /// Generate the [SymbolTable] directly.
     ///
     /// # Examples
     /// ```
     /// let rom = b"\\Comment\n(Label)\n\\Comment\n@1";
-    /// let symbol_table = hack_tools::assembly::FirstPass::new(&rom[..]).collect_symbol_table()?;
+    /// let symbol_table = hack_tools::assembly::FirstPass::new_symbol_table(&rom[..])?;
     /// # Ok::<(), hack_tools::Error>(())
     /// ```
-    pub fn collect_symbol_table(self) -> Result<SymbolTable, crate::Error> {
+    pub fn new_symbol_table(buffer: R) -> Result<SymbolTable, crate::Error> {
+        let iter = Self::new(buffer);
         let mut st = SymbolTable::new();
 
-        for label in self {
+        for label in iter {
             let LabelAddress {
                 label,
                 command_count,
@@ -36,7 +63,8 @@ impl<R: std::io::BufRead> FirstPass<R> {
             if st.inner.contains_key(&label) {
                 Err(crate::Error::SymbolTable(label_line))?
             }
-            st.inner.insert(label, command_count.into());
+            // Commands start at 0
+            st.inner.insert(label, (command_count - 1).into());
         }
 
         Ok(st)
@@ -122,9 +150,13 @@ impl<R: std::io::BufRead> std::iter::Iterator for FirstPass<R> {
     }
 }
 
+/// An iterator that spits out the binary .hack format.
+/// 
+/// [SymbolTable] can be populated by [FirstPass] if labels are in the assembly file.
 pub struct SecondPass<R> {
     inner: crate::assembly_io::Reader<R>,
     symbol_table: SymbolTable,
+    variable_symbol_count: i16,
 }
 
 impl<R: std::io::BufRead> SecondPass<R> {
@@ -132,30 +164,93 @@ impl<R: std::io::BufRead> SecondPass<R> {
         Self {
             inner: crate::assembly_io::Reader::new(buffer),
             symbol_table,
+            variable_symbol_count: 16,
         }
     }
 
-    // pub fn parse_a_command(&self) -> Result<crate::Bit15, crate::Error> {}
+    /// Read to the next command, return true if C-command and false if A-command.
+    /// 
+    /// # Examples
+    /// ```
+    /// let rom = b"\\Comment\n@h\nA;JMP";
+    /// let mut second_pass = hack_tools::assembly::SecondPass::new(
+    ///     &rom[..],
+    ///     hack_tools::assembly::SymbolTable::new(),
+    /// );
+    /// assert_eq!(second_pass.read_command()?, Some(false));
+    /// assert_eq!(second_pass.read_command()?, Some(true));
+    /// assert_eq!(second_pass.read_command()?, None);
+    /// # Ok::<(), hack_tools::Error>(())
+    /// ```
+    pub fn read_command(&mut self) -> Result<Option<bool>, crate::Error> {
+        self.inner.read_command()?;
+
+        match self.inner.is_c_command() {
+            Some(b) => Ok(Some(b)),
+            None => Ok(None)
+        }
+    }
+
+    /// Parses an A-command, resolving symbols if necessary.
+    /// 
+    /// Assumes the current line is an A-command.
+    /// 
+    /// # Examples
+    /// ```
+    /// let rom = b"@h\n@R6\n@000000000000011\n@h\n@h2";
+    /// let mut second_pass = hack_tools::assembly::SecondPass::new(
+    ///     &rom[..],
+    ///     hack_tools::assembly::SymbolTable::new(),
+    /// );
+    /// second_pass.read_command()?; 
+    /// assert_eq!(second_pass.parse_a_command()?, 16.into()); // Custom address starts at 16
+    /// second_pass.read_command()?; 
+    /// assert_eq!(second_pass.parse_a_command()?, 6.into());  // Predefined constant address
+    /// second_pass.read_command()?; 
+    /// assert_eq!(second_pass.parse_a_command()?, 3.into());
+    /// second_pass.read_command()?; 
+    /// assert_eq!(second_pass.parse_a_command()?, 16.into());
+    /// second_pass.read_command()?; 
+    /// assert_eq!(second_pass.parse_a_command()?, 17.into());
+    /// # Ok::<(), hack_tools::Error>(())
+    /// 
+    /// ```
+    pub fn parse_a_command(&mut self) -> Result<crate::Bit16, crate::Error> {
+        match self.inner.parse_a_command()? {
+            crate::assembly_io::SplitACommand::Address(b) => Ok(b.into()),
+            crate::assembly_io::SplitACommand::Symbol(s) => {
+                match self.symbol_table.inner.get(&s) {
+                    Some(b) => Ok(crate::Bit16::from(*b)),
+                    None => {
+                        let current_address = self.variable_symbol_count.into();
+                        self.symbol_table.inner.insert(s, current_address);
+                        self.variable_symbol_count += 1;
+                        Ok(current_address.into())
+                    } 
+                }
+            }
+        }
+    }
 }
 
-/*
 impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
-    type Item = Result<crate::Bit15, crate::Error>;
+    type Item = Result<crate::Bit16, crate::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.read_instruction() {
-                Ok(_) => {}
+            let c_command = match self.read_command() {
+                Ok(Some(c)) => c,
+                Ok(None) => break None,
                 Err(e) => break Some(Err(e)),
-            }
-            match self.inner.is_label() {
-                None => break None,
-                Some(true) => break Some(self.get_label_address()),
-                Some(false) => continue,
+            };
+
+            if c_command {
+                break Some(self.inner.parse_c_command())
+            } else {
+                break Some(self.parse_a_command())
             }
         }
     }
 }
-*/
 
 /// Symbol table generated by the first pass through the assembly code.
 ///
@@ -206,14 +301,14 @@ pub struct LabelAddress {
 }
 
 #[cfg(test)]
-mod cpu_tests {
+mod assembly_tests {
     use super::*;
 
     #[test]
     fn collect_symbol_table() -> Result<(), crate::Error> {
         let rom = b"\\Comment\n@0\n(Label)\n\\Comment\n@1";
-        let symbol_table = FirstPass::new(&rom[..]).collect_symbol_table()?;
-        assert_eq!(symbol_table.inner.get("Label"), Some(&2.into()));
+        let symbol_table = FirstPass::new_symbol_table(&rom[..])?;
+        assert_eq!(symbol_table.inner.get("Label"), Some(&1.into()));
         Ok(())
     }
 }

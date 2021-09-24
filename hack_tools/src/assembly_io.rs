@@ -4,6 +4,9 @@
 //!
 //! ## Why `i16` for line counting?
 //! The [hack_kernel::Computer] and the [ROM][hack_kernel::Rom32K] use a 15 bit address space. Although an .asm file (which is loaded in the ROM) could contain more lines than can be expressed by 15 bits (greater than 32767), the extra lines would not fit into the ROM. By using `i16` and starting from 0 (first bit is always 0), one gets a very convenient representation of a 15 bit address space. [crate::Bit15] contains a check for negative numbers, so will panic if integer overflow happens.
+//! 
+//! ## Why so many `Option`s?
+//! `None` represents nothing in the [Reader] buffer. This happens if no lines have been read or if EOF has been reached. It is possible to squint and avoid using `Option`. For example, [Reader::is_empty_line()] could be `false` rather than `None`. The advantage of that squint is that you don't have to deal with `Option` all the time (it is annoying). The disadvantage is that you don't have to deal with EOF explicitly. Even if there was a `is_eof()` function, it would be up to me to remember to check. `Option` forces that check, even if it is only to call `unwrap` (which, for the record, is not done). Explicit is better. The neat thing is that the `Option` design feeds in nicely into the [FirstPass][crate::assembly::FirstPass] and [SecondPass][crate::assembly::SecondPass] iterators.
 
 /// Low level reader of .asm files.
 ///
@@ -84,6 +87,37 @@ impl<R: std::io::BufRead> Reader<R> {
             }
         }
     }
+
+    /// Read the next command into the buffer, skipping non-command lines.
+    ///
+    /// Returns 0 if EOF was reached, otherwise the number of total lines read across all reads.
+    ///
+    /// # Examples
+    /// ```
+    /// let rom = b"\\Intro\n@1\n(Label)\nM=D";
+    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let (a, b, c) = (
+    ///     reader.read_command()?,
+    ///     reader.read_command()?,
+    ///     reader.read_command()?,
+    /// );
+    /// assert_eq!((a, b, c), (2, 4, 0));
+    /// # Ok::<(), hack_tools::Error>(())
+    /// ```
+    pub fn read_command(&mut self) -> Result<i16, crate::Error> {
+        loop {
+            self.read_line()?;
+            match self.is_command() {
+                None => break Ok(0),
+                Some(b) => {
+                    if b {
+                        break Ok(self.line);
+                    }
+                }
+            }
+        }
+    }
+
 
     /// Is the current line a command (A or C)
     ///
@@ -323,10 +357,11 @@ impl<R: std::io::BufRead> Reader<R> {
             Ok([false, false, false])
         }?;
 
-        let a_flag = if command_str.contains("A") {
-            false
-        } else {
+        // 0 a_flag also happens if there is no "A" string (such as 0;JMP)
+        let a_flag = if command_str.contains("M") {
             true
+        } else {
+            false
         };
         // Allocate a new string (bad), but cut down on comparisons (good)
         let a_command = command_str.replace("M", "A");
@@ -406,4 +441,31 @@ pub fn clean_line(line: &mut String) {
 pub enum SplitACommand {
     Address(crate::Bit15),
     Symbol(String),
+}
+
+mod assembly_io_tests {
+    #[test]
+    fn test_parse_c_command() -> Result<(), crate::Error> {
+        let rom = b"!A;JMP\nD=M-D";
+        let mut reader = crate::assembly_io::Reader::new(&rom[..]);
+        reader.read_line()?;
+        assert_eq!(reader.parse_c_command()?, "1110110001000111".parse()?);
+        reader.read_line()?;
+        assert_eq!(reader.parse_c_command()?, "1111000111010000".parse()?);
+        Ok(())
+    }
+
+    #[test]
+    /// 0 if calculation refers to A register, 1 if calculation refers to value of M
+    fn test_c_command_flag() -> Result<(), crate::Error> {
+        let rom = b"0;JMP\nA;JMP\nM;JMP";
+        let mut reader = crate::assembly_io::Reader::new(&rom[..]);
+        reader.read_line()?;
+        assert_eq!(reader.parse_c_command()?, "1110101010000111".parse()?);
+        reader.read_line()?;
+        assert_eq!(reader.parse_c_command()?, "1110110000000111".parse()?);
+        reader.read_line()?;
+        assert_eq!(reader.parse_c_command()?, "1111110000000111".parse()?);
+        Ok(())
+    }
 }

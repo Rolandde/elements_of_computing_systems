@@ -14,7 +14,7 @@
 /// i = "0110001111001012".parse();
 /// assert!(i.is_err());
 /// ```
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Bit16 {
     i: [bool; 16],
 }
@@ -52,6 +52,17 @@ impl std::convert::From<i16> for Bit16 {
     }
 }
 
+impl std::convert::From<Bit15> for Bit16 {
+    fn from(b: Bit15) -> Self {
+        Bit16 {
+            i: [
+                false, b.i[0], b.i[1], b.i[2], b.i[3], b.i[4], b.i[5], b.i[6], b.i[7], b.i[8],
+                b.i[9], b.i[10], b.i[11], b.i[12], b.i[13], b.i[14],
+            ],
+        }
+    }
+}
+
 impl std::fmt::Display for Bit16 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let x: String = self.i.iter().map(|&b| if b { '1' } else { '0' }).collect();
@@ -62,7 +73,7 @@ impl std::fmt::Display for Bit16 {
 /// A big endian 15 bit abstraction for the hack computer.
 ///
 /// Used for memory address.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Bit15 {
     i: [bool; 15],
 }
