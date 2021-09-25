@@ -1,28 +1,8 @@
 //! Assembler that converts from `.asm` assembly format to `.hack` machine instructions format.
 //! 
+//! You probably want to use [assemble_from_bytes] or [assemble_from_file].
+//!
 //! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
-//! 
-//! # Examples
-//! ```
-//! let asm = b"
-//! // This keeps adding 1 to the RAM address 16 forever.
-//! (FOREVER)
-//! @i
-//! M=M+1
-//! @FOREVER
-//! 0;JMP
-//! ";
-//! let symbol_table = hack_tools::assembly::FirstPass::new_symbol_table(&asm[..])?;
-//! let machine_code: Vec<hack_tools::Bit16> = hack_tools::assembly::SecondPass::new(
-//!     &asm[..], symbol_table
-//!     // Neat way of converting `Vec<Result>` to `Result<Vec>`
-//!     ).collect::<Result<Vec<_>, _>>()?;
-//! assert_eq!(machine_code.len(), 4);
-//! assert_eq!(machine_code[0], 16.into());
-//! assert_eq!(machine_code[1], "1111110111001000".parse()?);
-//! assert_eq!(machine_code[2], 0.into());
-//! assert_eq!(machine_code[3], "1110101010000111".parse()?);
-//! # Ok::<(), hack_tools::Error>(())
 //! ```
 
 /// An iterator over the assembly labels and the commands they point to.
@@ -151,7 +131,7 @@ impl<R: std::io::BufRead> std::iter::Iterator for FirstPass<R> {
 }
 
 /// An iterator that spits out the binary .hack format.
-/// 
+///
 /// [SymbolTable] can be populated by [FirstPass] if labels are in the assembly file.
 pub struct SecondPass<R> {
     inner: crate::assembly_io::Reader<R>,
@@ -169,7 +149,7 @@ impl<R: std::io::BufRead> SecondPass<R> {
     }
 
     /// Read to the next command, return true if C-command and false if A-command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// let rom = b"\\Comment\n@h\nA;JMP";
@@ -187,14 +167,14 @@ impl<R: std::io::BufRead> SecondPass<R> {
 
         match self.inner.is_c_command() {
             Some(b) => Ok(Some(b)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
     /// Parses an A-command, resolving symbols if necessary.
-    /// 
+    ///
     /// Assumes the current line is an A-command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// let rom = b"@h\n@R6\n@000000000000011\n@h\n@h2";
@@ -202,33 +182,31 @@ impl<R: std::io::BufRead> SecondPass<R> {
     ///     &rom[..],
     ///     hack_tools::assembly::SymbolTable::new(),
     /// );
-    /// second_pass.read_command()?; 
+    /// second_pass.read_command()?;
     /// assert_eq!(second_pass.parse_a_command()?, 16.into()); // Custom address starts at 16
-    /// second_pass.read_command()?; 
+    /// second_pass.read_command()?;
     /// assert_eq!(second_pass.parse_a_command()?, 6.into());  // Predefined constant address
-    /// second_pass.read_command()?; 
+    /// second_pass.read_command()?;
     /// assert_eq!(second_pass.parse_a_command()?, 3.into());
-    /// second_pass.read_command()?; 
+    /// second_pass.read_command()?;
     /// assert_eq!(second_pass.parse_a_command()?, 16.into());
-    /// second_pass.read_command()?; 
+    /// second_pass.read_command()?;
     /// assert_eq!(second_pass.parse_a_command()?, 17.into());
     /// # Ok::<(), hack_tools::Error>(())
-    /// 
+    ///
     /// ```
     pub fn parse_a_command(&mut self) -> Result<crate::Bit16, crate::Error> {
         match self.inner.parse_a_command()? {
             crate::assembly_io::SplitACommand::Address(b) => Ok(b.into()),
-            crate::assembly_io::SplitACommand::Symbol(s) => {
-                match self.symbol_table.inner.get(&s) {
-                    Some(b) => Ok(crate::Bit16::from(*b)),
-                    None => {
-                        let current_address = self.variable_symbol_count.into();
-                        self.symbol_table.inner.insert(s, current_address);
-                        self.variable_symbol_count += 1;
-                        Ok(current_address.into())
-                    } 
+            crate::assembly_io::SplitACommand::Symbol(s) => match self.symbol_table.inner.get(&s) {
+                Some(b) => Ok(crate::Bit16::from(*b)),
+                None => {
+                    let current_address = self.variable_symbol_count.into();
+                    self.symbol_table.inner.insert(s, current_address);
+                    self.variable_symbol_count += 1;
+                    Ok(current_address.into())
                 }
-            }
+            },
         }
     }
 }
@@ -244,9 +222,9 @@ impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
             };
 
             if c_command {
-                break Some(self.inner.parse_c_command())
+                break Some(self.inner.parse_c_command());
             } else {
-                break Some(self.parse_a_command())
+                break Some(self.parse_a_command());
             }
         }
     }
@@ -298,6 +276,61 @@ pub struct LabelAddress {
     pub command_count: i16,
     /// Total raw lines read to get to the label
     pub label_line: i16,
+}
+
+/// Two pass assembly from a byte source.
+/// 
+/// # Examples
+/// ```
+/// let asm = b"
+/// // This keeps adding 1 to the RAM address 16 forever.
+/// (FOREVER)
+/// @i
+/// M=M+1
+/// @FOREVER
+/// 0;JMP
+/// ";
+/// let second_pass_iter = hack_tools::assembly::assemble_from_bytes(&asm[..])?;
+/// // Neat way of converting `Vec<Result>` to `Result<Vec>`
+/// let machine_code = second_pass_iter.collect::<Result<Vec<_>, _>>()?;
+/// assert_eq!(machine_code.len(), 4);
+/// assert_eq!(machine_code[0], 16.into());
+/// assert_eq!(machine_code[1], "1111110111001000".parse()?);
+/// assert_eq!(machine_code[2], 0.into());
+/// assert_eq!(machine_code[3], "1110101010000111".parse()?);
+/// # Ok::<(), hack_tools::Error>(())
+/// ```
+pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, crate::Error> {
+    let symbol_table = FirstPass::new_symbol_table(from)?;
+    Ok(SecondPass::new(from, symbol_table))
+}
+
+
+/// Two pass assembly from a `.asm` file.
+/// 
+/// # Examples
+/// ```
+/// let mut d = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+/// d.push("resources/test/example.asm");
+/// let second_pass_iter = hack_tools::assembly::assemble_from_file(d)?;
+/// // Neat way of converting `Vec<Result>` to `Result<Vec>`
+/// let machine_code = second_pass_iter.collect::<Result<Vec<_>, _>>()?;
+/// assert_eq!(machine_code.len(), 4);
+/// assert_eq!(machine_code[0], 16.into());
+/// assert_eq!(machine_code[1], "1111110111001000".parse()?);
+/// assert_eq!(machine_code[2], 0.into());
+/// assert_eq!(machine_code[3], "1110101010000111".parse()?);
+/// # Ok::<(), hack_tools::Error>(())
+/// ```
+pub fn assemble_from_file<P: AsRef<std::path::Path>>(
+    path: P,
+) -> Result<SecondPass<std::io::BufReader<std::fs::File>>, crate::Error> {
+    let mut f = std::fs::File::open(path.as_ref())?;
+    let mut buf = std::io::BufReader::new(f);
+    let symbol_table = FirstPass::new_symbol_table(buf)?;
+    f = std::fs::File::open(path)?;
+    buf = std::io::BufReader::new(f);
+    Ok(SecondPass::new(buf, symbol_table))
 }
 
 #[cfg(test)]

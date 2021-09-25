@@ -93,6 +93,36 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for Instructions<'a, R> {
     }
 }
 
+pub struct Writer<W> {
+    inner: W
+}
+
+impl<W: std::io::Write> Writer<W> {
+    pub fn new(inner: W) -> Self {
+        Self {inner}
+    }
+
+    /// Write a single instruction
+    /// 
+    /// # Examples
+    /// ```
+    /// let mut w = hack_tools::hack_io::Writer::new(Vec::new());
+    /// let bit_42 = 42.into();
+    /// w.write_instruction(&bit_42);
+    /// assert_eq!(w.as_ref(), &b"0000000000101010\n".to_vec());
+    /// ```
+    pub fn write_instruction(&mut self, instruction: &crate::Bit16) -> Result<(), crate::Error> {
+        writeln!(self.inner, "{}", instruction)?;
+        Ok(())
+    }
+}
+
+impl<W> std::convert::AsRef<W> for Writer<W> {
+    fn as_ref(&self) -> &W {
+        &self.inner
+    }
+}
+
 /// Create a ROM from a buffer that holds instructions in `.hack` format
 ///
 /// # Examples
