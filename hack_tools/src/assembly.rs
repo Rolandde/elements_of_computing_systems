@@ -26,7 +26,7 @@ impl<R: std::io::BufRead> FirstPass<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"\\Comment\n(Label)\n\\Comment\n@1";
+    /// let rom = b"//Comment\n(Label)\n//Comment\n@1";
     /// let symbol_table = hack_tools::assembly::FirstPass::new_symbol_table(&rom[..])?;
     /// # Ok::<(), hack_tools::Error>(())
     /// ```
@@ -56,7 +56,7 @@ impl<R: std::io::BufRead> FirstPass<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"\\Nothing\n@Yes\nNo";
+    /// let rom = b"//Nothing\n@Yes\nNo";
     /// let mut reader = hack_tools::assembly::FirstPass::new(&rom[..]);
     /// assert_eq!(reader.read_instruction()?, 2);
     /// assert_eq!(reader.read_instruction()?, 3);
@@ -78,7 +78,7 @@ impl<R: std::io::BufRead> FirstPass<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"\\Comment\n(Label)\n\\Comment\n@1";
+    /// let rom = b"//Comment\n(Label)\n//Comment\n@1";
     /// let mut first_pass = hack_tools::assembly::FirstPass::new(&rom[..]);
     /// first_pass.read_instruction()?;
     /// assert_eq!(
@@ -152,7 +152,7 @@ impl<R: std::io::BufRead> SecondPass<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"\\Comment\n@h\nA;JMP";
+    /// let rom = b"//Comment\n@h\nA;JMP";
     /// let mut second_pass = hack_tools::assembly::SecondPass::new(
     ///     &rom[..],
     ///     hack_tools::assembly::SymbolTable::new(),
@@ -177,7 +177,7 @@ impl<R: std::io::BufRead> SecondPass<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"@h\n@R6\n@000000000000011\n@h\n@h2";
+    /// let rom = b"@h\n@R6\n@3\n@h\n@h2";
     /// let mut second_pass = hack_tools::assembly::SecondPass::new(
     ///     &rom[..],
     ///     hack_tools::assembly::SymbolTable::new(),
@@ -339,7 +339,7 @@ mod assembly_tests {
 
     #[test]
     fn collect_symbol_table() -> Result<(), crate::Error> {
-        let rom = b"\\Comment\n@0\n(Label)\n\\Comment\n@1";
+        let rom = b"//Comment\n@0\n(Label)\n//Comment\n@1";
         let symbol_table = FirstPass::new_symbol_table(&rom[..])?;
         assert_eq!(symbol_table.inner.get("Label"), Some(&1.into()));
         Ok(())

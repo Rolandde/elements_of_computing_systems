@@ -32,7 +32,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"Create\nlife \\carefully";
+    /// let rom = b"Create\nlife //carefully";
     /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
     /// let (a, b, c, d) = (
     ///     reader.read_line()?,
@@ -63,7 +63,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"I\n\nlike\n\\me\nyou";
+    /// let rom = b"I\n\nlike\n//me\nyou";
     /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
     /// let (a, b, c, d) = (
     ///     reader.read_instruction()?,
@@ -94,7 +94,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"\\Intro\n@1\n(Label)\nM=D";
+    /// let rom = b"//Intro\n@1\n(Label)\nM=D";
     /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
     /// let (a, b, c) = (
     ///     reader.read_command()?,
@@ -190,7 +190,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"Create\n\\life \\carefully";
+    /// let rom = b"Create\n//life //carefully";
     /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_empty_line(), Some(false));
@@ -265,12 +265,12 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"@010011010011100\n@Symbol";
+    /// let rom = b"@100\n@Symbol";
     /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
-    ///     hack_tools::assembly_io::SplitACommand::Address("010011010011100".parse()?)
+    ///     hack_tools::assembly_io::SplitACommand::Address("000000001100100".parse()?)
     /// );
     ///
     /// reader.read_line()?;
@@ -281,7 +281,6 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Ok::<(), hack_tools::Error>(())
     /// ```
     pub fn parse_a_command(&self) -> Result<SplitACommand, crate::Error> {
-        use std::str::FromStr;
         let line = self.line;
         let a = self.buffer.as_ref().ok_or(crate::Error::ACommand(line))?;
         let first = a.chars().next().ok_or(crate::Error::ACommand(line))?;
@@ -289,12 +288,9 @@ impl<R: std::io::BufRead> Reader<R> {
             Err(crate::Error::ACommand(line))
         } else {
             let s = a.get(1..).ok_or(crate::Error::ACommand(line))?;
-            if s.starts_with(|c: char| c.is_digit(10)) {
-                Ok(SplitACommand::Address(
-                    crate::Bit15::from_str(s).map_err(|_| crate::Error::ACommand(line))?,
-                ))
-            } else {
-                Ok(SplitACommand::Symbol(s.to_string()))
+            match s.parse::<i16>() {
+                Ok(i) => Ok(SplitACommand::Address(crate::Bit15::from(i))),
+                Err(_) => Ok(SplitACommand::Symbol(s.to_string()))  // TODO: Invalid symbol checking
             }
         }
     }
@@ -417,18 +413,18 @@ impl<R: std::io::BufRead> Reader<R> {
 /// # Examples
 /// ```
 /// use hack_tools::assembly_io::clean_line;
-/// let mut s = "in st \\spaces and trailing comment".to_string();
+/// let mut s = "in st //spaces and trailing comment".to_string();
 /// clean_line(&mut s);
 /// assert_eq!(s, "inst".to_string());
 /// clean_line(&mut s);
 /// assert_eq!(s, "inst".to_string());
-/// s = "\\ Starting comment".to_string();
+/// s = "// Starting comment".to_string();
 /// clean_line(&mut s);
 /// assert_eq!(s, "".to_string());
 /// ```
 pub fn clean_line(line: &mut String) {
     line.retain(|c| !c.is_whitespace());
-    let no_comments = match line.split_once("\\") {
+    let no_comments = match line.split_once("//") {
         None => line.to_string(),
         Some((instruction, _)) => instruction.to_string(),
     };
