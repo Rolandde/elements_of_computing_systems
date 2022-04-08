@@ -4,4 +4,5 @@ members = [
     "hack_kernel",
     "hack_tools",
     "hack_computer",
+    "hack_virtual_machine",
 ]

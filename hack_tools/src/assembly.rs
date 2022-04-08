@@ -3,7 +3,6 @@
 //! You probably want to use [assemble_from_bytes] or [assemble_from_file].
 //!
 //! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
-//! ```
 
 /// An iterator over the assembly labels and the commands they point to.
 ///

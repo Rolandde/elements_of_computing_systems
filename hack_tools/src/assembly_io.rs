@@ -28,7 +28,7 @@ impl<R: std::io::BufRead> Reader<R> {
         reader
     }
 
-    /// Read the next line into the buffer and [clean][clean_line] it. Returns true if line was read and false if EOF was reached.
+    /// Read the next line into the buffer and [cleans][clean_line] it. Returns true if line was read and false if EOF was reached.
     ///
     /// # Examples
     /// ```
@@ -408,7 +408,7 @@ impl<R: std::io::BufRead> Reader<R> {
 
 /// Remove all white space and comment characters. May leave an empty string.
 ///
-/// Comment characters are those following `"\\"` (including itself).
+/// Comment characters are those following `"//"` (including itself).
 ///
 /// # Examples
 /// ```
