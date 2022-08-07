@@ -11,6 +11,8 @@
 /// Low level reader of .asm files.
 ///
 /// If you want full control over reading. [crate::assembly::FirstPass] and [crate::assembly::SecondPass] offer simpler abstractions for parsing .asm files.
+
+use hack_interface;
 pub struct Reader<R> {
     inner: R,
     buffer: Option<String>,
@@ -33,7 +35,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"Create\nlife //carefully";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// let (a, b, c, d) = (
     ///     reader.read_line()?,
     ///     reader.read_line()?,
@@ -41,9 +43,9 @@ impl<R: std::io::BufRead> Reader<R> {
     ///     reader.read_line()?,
     /// );
     /// assert_eq!((a, b, c, d), (true, true, false, false));
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn read_line(&mut self) -> Result<bool, crate::Error> {
+    pub fn read_line(&mut self) -> Result<bool, hack_interface::Error> {
         let mut temp = "".to_string();
         let read = self.inner.read_line(&mut temp)?;
         if read == 0 {
@@ -64,7 +66,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"I\n\nlike\n//me\nyou";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// let (a, b, c, d) = (
     ///     reader.read_instruction()?,
     ///     reader.read_instruction()?,
@@ -72,9 +74,9 @@ impl<R: std::io::BufRead> Reader<R> {
     ///     reader.read_instruction()?,
     /// );
     /// assert_eq!((a, b, c, d), (1, 3, 5, 0));
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn read_instruction(&mut self) -> Result<i16, crate::Error> {
+    pub fn read_instruction(&mut self) -> Result<i16, hack_interface::Error> {
         loop {
             self.read_line()?;
             match self.is_empty_line() {
@@ -95,16 +97,16 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"//Intro\n@1\n(Label)\nM=D";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// let (a, b, c) = (
     ///     reader.read_command()?,
     ///     reader.read_command()?,
     ///     reader.read_command()?,
     /// );
     /// assert_eq!((a, b, c), (2, 4, 0));
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn read_command(&mut self) -> Result<i16, crate::Error> {
+    pub fn read_command(&mut self) -> Result<i16, hack_interface::Error> {
         loop {
             self.read_line()?;
             match self.is_command() {
@@ -124,14 +126,14 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"@Yes\nYes;\nNo";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_command(), Some(true));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_command(), Some(true));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_command(), Some(false));
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
     pub fn is_command(&self) -> Option<bool> {
         if let (Some(a), Some(c)) = (self.is_a_command(), self.is_c_command()) {
@@ -146,14 +148,14 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"@Yes\nNo";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_a_command(), Some(true));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_a_command(), Some(false));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_a_command(), None);
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     ///
     /// ```
     pub fn is_a_command(&self) -> Option<bool> {
@@ -167,7 +169,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"Yes=\n;Yes\nNo";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_c_command(), Some(true));
     /// reader.read_line()?;
@@ -176,7 +178,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert_eq!(reader.is_c_command(), Some(false));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_c_command(), None);
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     ///
     /// ```
     pub fn is_c_command(&self) -> Option<bool> {
@@ -191,12 +193,12 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"Create\n//life //carefully";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_empty_line(), Some(false));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_empty_line(), Some(true));
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     ///
     /// ```
     pub fn is_empty_line(&self) -> Option<bool> {
@@ -213,14 +215,14 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"(Yes\nNo";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_label(), Some(true));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_label(), Some(false));
     /// reader.read_line()?;
     /// assert_eq!(reader.is_label(), None);
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     ///
     /// ```
     pub fn is_label(&self) -> Option<bool> {
@@ -237,21 +239,21 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"(Yes)";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.parse_label()?, Some("Yes".to_string()));
     /// reader.read_line()?;
     /// assert_eq!(reader.parse_label()?, None);
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn parse_label(&self) -> Result<Option<String>, crate::Error> {
+    pub fn parse_label(&self) -> Result<Option<String>, hack_interface::Error> {
         if let Some(a) = &self.buffer {
             if !a.starts_with('(') || !a.ends_with(')') {
-                Err(crate::Error::AssemblyLabel(self.line))
+                Err(hack_interface::Error::AssemblyLabel(self.line))
             } else {
                 let s = a
                     .get(1..a.len() - 1)
-                    .ok_or(crate::Error::AssemblyLabel(self.line))?;
+                    .ok_or(hack_interface::Error::AssemblyLabel(self.line))?;
                 Ok(Some(s.to_string()))
             }
         } else {
@@ -266,30 +268,30 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"@100\n@Symbol";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
-    ///     hack_tools::assembly_io::SplitACommand::Address("000000001100100".parse()?)
+    ///     hack_assembler::assembly_io::SplitACommand::Address("000000001100100".parse()?)
     /// );
     ///
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
-    ///     hack_tools::assembly_io::SplitACommand::Symbol("Symbol".to_string())
+    ///     hack_assembler::assembly_io::SplitACommand::Symbol("Symbol".to_string())
     /// );
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn parse_a_command(&self) -> Result<SplitACommand, crate::Error> {
+    pub fn parse_a_command(&self) -> Result<SplitACommand, hack_interface::Error> {
         let line = self.line;
-        let a = self.buffer.as_ref().ok_or(crate::Error::ACommand(line))?;
-        let first = a.chars().next().ok_or(crate::Error::ACommand(line))?;
+        let a = self.buffer.as_ref().ok_or(hack_interface::Error::ACommand(line))?;
+        let first = a.chars().next().ok_or(hack_interface::Error::ACommand(line))?;
         if first != '@' {
-            Err(crate::Error::ACommand(line))
+            Err(hack_interface::Error::ACommand(line))
         } else {
-            let s = a.get(1..).ok_or(crate::Error::ACommand(line))?;
+            let s = a.get(1..).ok_or(hack_interface::Error::ACommand(line))?;
             match s.parse::<i16>() {
-                Ok(i) => Ok(SplitACommand::Address(crate::Bit15::from(i))),
+                Ok(i) => Ok(SplitACommand::Address(hack_interface::Bit15::from(i))),
                 Err(_) => Ok(SplitACommand::Symbol(s.to_string()))  // TODO: Invalid symbol checking
             }
         }
@@ -302,18 +304,18 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"M=D+A;JGE";
-    /// let mut reader = hack_tools::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_c_command()?,
     ///     "1110000010001011".parse()?
     /// );
-    /// # Ok::<(), hack_tools::Error>(())
+    /// # Ok::<(), hack_interface::Error>(())
     /// ```
     ///
-    pub fn parse_c_command(&self) -> Result<crate::Bit16, crate::Error> {
+    pub fn parse_c_command(&self) -> Result<hack_interface::Bit16, hack_interface::Error> {
         let line = self.line;
-        let str_command = self.buffer.as_ref().ok_or(crate::Error::CCommand(line))?;
+        let str_command = self.buffer.as_ref().ok_or(hack_interface::Error::CCommand(line))?;
         let (destination_str, rest) = match str_command.split_once("=") {
             Some((d, r)) => (Some(d), r),
             None => (None, str_command.as_ref()),
@@ -327,7 +329,7 @@ impl<R: std::io::BufRead> Reader<R> {
                 "AM" => Ok([true, false, true]),
                 "AD" => Ok([true, true, false]),
                 "AMD" => Ok([true, true, true]),
-                _ => Err(crate::Error::CCommand(line)),
+                _ => Err(hack_interface::Error::CCommand(line)),
             }
         } else {
             Ok([false, false, false])
@@ -347,7 +349,7 @@ impl<R: std::io::BufRead> Reader<R> {
                 "JNE" => Ok([true, false, true]),
                 "JLE" => Ok([true, true, false]),
                 "JMP" => Ok([true, true, true]),
-                _ => Err(crate::Error::CCommand(line)),
+                _ => Err(hack_interface::Error::CCommand(line)),
             }
         } else {
             Ok([false, false, false])
@@ -380,11 +382,10 @@ impl<R: std::io::BufRead> Reader<R> {
             "A-D" => Ok(hack_kernel::arithmetic::ALU_Y_MINUS_X),
             "D&A" => Ok(hack_kernel::arithmetic::ALU_X_AND_Y),
             "D|A" => Ok(hack_kernel::arithmetic::ALU_X_OR_Y),
-            _ => Err(crate::Error::CCommand(line)),
+            _ => Err(hack_interface::Error::CCommand(line)),
         }?;
 
-        Ok(crate::Bit16 {
-            i: [
+        Ok(hack_interface::Bit16::from([
                 true,
                 true,
                 true,
@@ -401,8 +402,8 @@ impl<R: std::io::BufRead> Reader<R> {
                 jump[0],
                 jump[1],
                 jump[2],
-            ],
-        })
+            ]
+        ))
     }
 }
 
@@ -412,7 +413,7 @@ impl<R: std::io::BufRead> Reader<R> {
 ///
 /// # Examples
 /// ```
-/// use hack_tools::assembly_io::clean_line;
+/// use hack_assembler::assembly_io::clean_line;
 /// let mut s = "in st //spaces and trailing comment".to_string();
 /// clean_line(&mut s);
 /// assert_eq!(s, "inst".to_string());
@@ -435,13 +436,13 @@ pub fn clean_line(line: &mut String) {
 /// A parsed A-command can be either an address or a symbol
 #[derive(Debug, PartialEq, Eq)]
 pub enum SplitACommand {
-    Address(crate::Bit15),
+    Address(hack_interface::Bit15),
     Symbol(String),
 }
 
 mod assembly_io_tests {
     #[test]
-    fn test_parse_c_command() -> Result<(), crate::Error> {
+    fn test_parse_c_command() -> Result<(), hack_interface::Error> {
         let rom = b"!A;JMP\nD=M-D";
         let mut reader = crate::assembly_io::Reader::new(&rom[..]);
         reader.read_line()?;
@@ -453,7 +454,7 @@ mod assembly_io_tests {
 
     #[test]
     /// 0 if calculation refers to A register, 1 if calculation refers to value of M
-    fn test_c_command_flag() -> Result<(), crate::Error> {
+    fn test_c_command_flag() -> Result<(), hack_interface::Error> {
         let rom = b"0;JMP\nA;JMP\nM;JMP";
         let mut reader = crate::assembly_io::Reader::new(&rom[..]);
         reader.read_line()?;

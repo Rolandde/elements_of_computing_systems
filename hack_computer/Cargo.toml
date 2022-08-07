@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 hack_kernel = {path = "../hack_kernel"}
-hack_tools = {path = "../hack_tools"}
+hack_interface = {path = "../hack_interface"}
 
-minifb = "0.19.3"
+minifb = "0.23"

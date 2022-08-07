@@ -14,7 +14,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_tools::hack_io::Reader;
+    /// use hack_interface::hack_io::Reader;
     /// let hack = b"0110000011001010\n1100111101100000";
     /// let mut reader = Reader::new(&hack[..]);
     /// ```
@@ -31,7 +31,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_tools::hack_io::Reader;
+    /// use hack_interface::hack_io::Reader;
     /// let hack = b"0110000011001010\n1100111101100000";
     /// let mut reader = Reader::new(&hack[..]);
     /// assert_eq!(reader.read_instruction().unwrap(), Some("0110000011001010".parse().unwrap()));
@@ -55,7 +55,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_tools::hack_io::Reader;
+    /// use hack_interface::hack_io::Reader;
     /// let hack = b"0110000011001010\n1100111101100000";
     /// let mut reader = Reader::new(&hack[..]);
     /// let mut iter = reader.instructions();
@@ -107,7 +107,7 @@ impl<W: std::io::Write> Writer<W> {
     /// 
     /// # Examples
     /// ```
-    /// let mut w = hack_tools::hack_io::Writer::new(Vec::new());
+    /// let mut w = hack_interface::hack_io::Writer::new(Vec::new());
     /// let bit_42 = 42.into();
     /// w.write_instruction(&bit_42);
     /// assert_eq!(w.as_ref(), &b"0000000000101010\n".to_vec());
@@ -128,7 +128,7 @@ impl<W> std::convert::AsRef<W> for Writer<W> {
 ///
 /// # Examples
 /// ```
-/// use hack_tools::hack_io::write_rom_from_buffer;
+/// use hack_interface::hack_io::write_rom_from_buffer;
 /// use hack_kernel::Computer;
 /// let input = b"0110001111001010\n1111000011110000";
 /// let rom = write_rom_from_buffer(&input[..]);
@@ -152,7 +152,7 @@ pub fn write_rom_from_buffer(buf: impl std::io::BufRead) -> hack_kernel::Rom32K 
 ///
 /// # Examples
 /// ```
-/// use hack_tools::hack_io::write_rom_from_file;
+/// use hack_interface::hack_io::write_rom_from_file;
 /// use hack_kernel::Computer;
 /// // A simple `.hack` file with two lines
 /// let mut d = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));

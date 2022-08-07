@@ -9,9 +9,9 @@ fn main() {
     let mut args =  std::env::args();
     args.next(); // Program name
     let file = args.next().expect("No file specified");
-    let rom = hack_tools::hack_io::write_rom_from_file(file);
+    let rom = hack_interface::hack_io::write_rom_from_file(file);
     let mut comp = hack_kernel::Computer::new(rom);
-    let mut debug = hack_tools::Debugger::new(&mut comp);
+    let mut debug = hack_interface::Debugger::new(&mut comp);
     debug.write_memory(0.into(), 10.into());
 
     let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
@@ -32,7 +32,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         debug.computer().cycle(false);
 
-        for (pos, pixel) in hack_tools::Scan::new(&debug.computer()).enumerate() {
+        for (pos, pixel) in hack_interface::Scan::new(&debug.computer()).enumerate() {
             if pixel {
                 buffer[pos] = 0
             } else {

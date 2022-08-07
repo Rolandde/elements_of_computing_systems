@@ -1,8 +1,9 @@
 [workspace]
 
 members = [
+    "hack_assembler",
     "hack_kernel",
-    "hack_tools",
+    "hack_interface",
     "hack_computer",
     "hack_virtual_machine",
 ]

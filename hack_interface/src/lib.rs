@@ -1,10 +1,10 @@
-//! Tools for interacting with the [hack kernel][hack_kernel]
+//! Tools for interacting with the [hack kernel][hack_kernel].
 
 /// A big endian 16 bit abstraction for the hack computer.
 ///
 /// # Examples
 /// ```
-/// use hack_tools::{Bit16, Error};
+/// use hack_interface::{Bit16, Error};
 /// let mut i: Result<Bit16, Error> = "0110001111001010".parse();
 /// assert!(i.is_ok());
 /// // 16 bits are exactly 16 characters long
@@ -266,9 +266,6 @@ impl<'a> std::iter::Iterator for Scan<'a> {
     }
 }
 
-pub mod assembly;
-pub mod assembly_io;
-pub mod book_exercises;
 pub mod hack_io;
 
 #[cfg(test)]
@@ -284,4 +281,76 @@ mod cpu_tests {
         let pixel_count = scan.collect::<Vec<bool>>().len();
         assert_eq!(pixel_count, 131072);
     }
+}
+
+#[cfg(test)]
+mod book_tests {
+    use super::*;
+
+    /// Machine code to add 2 and 3 and store result to RAM\[0\].
+    pub const TWO_PLUS_THREE: &'static str = "0000000000000010
+1110110000010000
+0000000000000011
+1110000010010000
+0000000000000000
+1110001100001000
+";
+
+    /// Add 2 and 3 and store result to RAM\[0\].
+    ///
+    /// The hack machine code was given to test that the computer functions properly.
+    #[test]
+    pub fn chapter5_add() {
+        let rom = crate::hack_io::write_rom_from_buffer(TWO_PLUS_THREE.as_bytes());
+        let mut computer = hack_kernel::Computer::new(rom);
+        for _ in 0..6 {
+            computer.cycle(false);
+        }
+        let add = Debugger::new(&mut computer).read_memory("000000000000000".parse().unwrap());
+        assert_eq!(add, "0000000000000101".parse().unwrap());
+    }
+
+    /// Write the max number to RAM\[2\], with the two input numbers at RAM\[0\] and RAM\[1\]
+    ///
+    /// The hack machine code was given to test that the computer functions properly.
+    pub fn chapter5_max(a: Bit16, b: Bit16) -> Bit16 {
+        let rom = crate::hack_io::write_rom_from_buffer(PICK_MAX.as_bytes());
+        let mut computer = hack_kernel::Computer::new(rom);
+        let mut debugger = Debugger::new(&mut computer);
+        debugger.write_memory(Bit15::from(0), a);
+        debugger.write_memory(Bit15::from(1), b);
+        // Machine code loops infinitely from the last line
+        while debugger.read_cpu_counter() != Bit16::from(15) {
+            debugger.computer().cycle(false)
+        }
+        debugger.read_memory(Bit15::from(2))
+    }
+
+    /// Machine code to Write the max number to RAM\[2\], with the two input numbers at RAM\[0\] and RAM\[1\]
+    pub const PICK_MAX: &'static str = "0000000000000000
+1111110000010000
+0000000000000001
+1111010011010000
+0000000000001010
+1110001100000001
+0000000000000001
+1111110000010000
+0000000000001100
+1110101010000111
+0000000000000000
+1111110000010000
+0000000000000010
+1110001100001000
+0000000000001110
+1110101010000111
+";
+
+    #[test]
+    pub fn chapter5_max_test() {
+        assert_eq!(chapter5_max(1.into(), 2.into()), 2.into());
+        assert_eq!(chapter5_max(2.into(), 1.into()), 2.into());
+        assert_eq!(chapter5_max(0.into(), 0.into()), 0.into());
+        assert_eq!(chapter5_max(Bit16::from(-1), Bit16::from(-2)), Bit16::from(-1));
+    }
+
 }
