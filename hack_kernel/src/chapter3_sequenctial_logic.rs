@@ -61,7 +61,7 @@ impl Dff {
     }
 }
 
-/// The memorable Bit. If `load` is set when cycle starts, the starting cycle will store the input of the previous cycle. If not, starting cycle output will be the output of the previous cycle.
+/// The memorable Bit. If `load` is set when cycle starts, the starting cycle will store the input of the previous cycle. Cycle output will be the state from the previous cycle.
 ///
 /// # Examples
 /// ```

@@ -4,7 +4,7 @@
 //! The kernel does not depend on the Rust `std` library, but uses the `alloc` crate. This means the system using this needs to be able to allocate memory on the heap. Allocation was necessary as stack overflow errors happened with the memory. A 32K memory of 16 [Bit][crate::seq_logic::Bit] registers has 524288 [Bit][crate::seq_logic::Bit]s. Each Bit is a bool (1 byte), so the stack has to hold more than 4 megabytes. This crashes on my Windows 10 machine (curious how much stack Ubuntu provides).
 //! 
 //! # Note on cheating with memory
-//! The 32K [memory][architecture::DataMemory] is much too slow to be used in the [Computer]. It takes more than 10 seconds to scan through the screen with the release build. This is because a real hardware chip works in parallel, but the software emulated hardware does not. To read or write to the emulated memory, each register has to be visited on at a time. To stress this, specifying a single address still leads to every address being visited. This is an unavoidable outcome of following the rules of the game: building the emulated computer hardware from a single chip.
+//! The 32K [memory][architecture::DataMemory] is much too slow to be used in the [Computer]. It takes more than 10 seconds to scan through the screen with the release build. This is because a real hardware chip works in parallel, but the software emulated hardware does not. To read or write to the emulated memory, each register has to be visited one at a time. To stress this, specifying a single address still leads to every address being visited. This is an unavoidable outcome of following the rules of the game: building the emulated computer hardware from a single chip.
 //! 
 //! There is no point in dying on the hill of principle, so there exists [architecture::CheatingDataMemory]. It is this memory which is used in [Computer] and [Rom32K]. It cheats by emulating the memory as one vector of registers. The address is converted to the index of the register. A read or write operation visits only a single register, which is way faster than visiting them all.
 
@@ -21,7 +21,7 @@ pub use chapter2_arithmetic as arithmetic;
 pub use chapter3_sequenctial_logic as seq_logic;
 pub use chapter5_computer_architecture as architecture;
 
-/// Convenience function to get `bool` arrays from specific numbers.
+/// Convenience function to get 16 element `bool` arrays from specific numbers.
 ///
 /// # Examples
 /// ```
