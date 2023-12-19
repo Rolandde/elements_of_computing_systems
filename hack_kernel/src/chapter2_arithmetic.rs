@@ -34,16 +34,16 @@
 //! assert_eq!(alu::alu(x, y, alu::ALU_ZERO), (from_i16(0), true, false));
 //! assert_eq!(alu::alu(x, y, alu::ALU_ONE), (from_i16(1), false, false));
 //! assert_eq!(alu::alu(x, y, alu::ALU_MINUS_ONE), (from_i16(-1), false, true));
-//! 
+//!
 //! // Single input ALU operations
 //! assert_eq!(alu::alu(x, y, alu::ALU_X), (from_i16(22), false, false));
 //! assert_eq!(alu::alu(x, y, alu::ALU_Y), (from_i16(42), false, false));
 //! assert_eq!(
-//!     alu::alu(x, y, alu::ALU_X_NOT), 
+//!     alu::alu(x, y, alu::ALU_X_NOT),
 //!     (gates::not_multibit_gate(x), false, true)
 //! );
 //! assert_eq!(
-//!     alu::alu(x, y, alu::ALU_Y_NOT), 
+//!     alu::alu(x, y, alu::ALU_Y_NOT),
 //!     (gates::not_multibit_gate(y), false, true)
 //! );
 //! assert_eq!(alu::alu(x, y, alu::ALU_X_MINUS), (from_i16(-22), false, true));
@@ -52,20 +52,20 @@
 //! assert_eq!(alu::alu(x, y, alu::ALU_Y_PLUS1), (from_i16(43), false, false));
 //! assert_eq!(alu::alu(x, y, alu::ALU_X_MINUS1), (from_i16(21), false, false));
 //! assert_eq!(alu::alu(x, y, alu::ALU_Y_MINUS1), (from_i16(41), false, false));
-//! 
+//!
 //! // Arithmetic ALU operations
 //! assert_eq!(alu::alu(x, y, alu::ALU_X_PLUS_Y), (from_i16(64), false, false));
 //! assert_eq!(alu::alu(x, y, alu::ALU_X_MINUS_Y), (from_i16(-20), false, true));
 //! assert_eq!(alu::alu(x, y, alu::ALU_Y_MINUS_X), (from_i16(20), false, false));
 //! assert_eq!(alu::alu(y, y, alu::ALU_Y_MINUS_X), (from_i16(0), true, false));
-//! 
+//!
 //! // Bitwise ALU operations
 //! assert_eq!(
-//!     alu::alu(x, y, alu::ALU_X_AND_Y), 
+//!     alu::alu(x, y, alu::ALU_X_AND_Y),
 //!     (gates::and_multibit_gate(x, y), false, false)
 //! );
 //! assert_eq!(
-//!     alu::alu(x, y, alu::ALU_X_OR_Y), 
+//!     alu::alu(x, y, alu::ALU_X_OR_Y),
 //!     (gates::or_multibit_gate(x, y), false, false)
 //! );
 //! ```
@@ -183,9 +183,9 @@ pub const ALU_ZERO: [bool; 6] = [true, false, true, false, true, false];
 pub const ALU_ONE: [bool; 6] = [true, true, true, true, true, true];
 /// Returns -1
 pub const ALU_MINUS_ONE: [bool; 6] = [true, true, true, false, true, false];
-/// Returns X 
+/// Returns X
 pub const ALU_X: [bool; 6] = [false, false, true, true, false, false];
-/// Returns Y 
+/// Returns Y
 pub const ALU_Y: [bool; 6] = [true, true, false, false, false, false];
 /// Returns NOT(X)
 pub const ALU_X_NOT: [bool; 6] = [false, false, true, true, false, true];
@@ -219,7 +219,7 @@ mod alu_tests {
     use super::*;
     use crate::from_i16;
     #[test]
-    fn subtraction(){
+    fn subtraction() {
         assert_eq!(
             alu(from_i16(100), from_i16(18), ALU_X_MINUS_Y),
             (from_i16(82), false, false)

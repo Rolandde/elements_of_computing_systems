@@ -350,7 +350,9 @@ mod book_tests {
         assert_eq!(chapter5_max(1.into(), 2.into()), 2.into());
         assert_eq!(chapter5_max(2.into(), 1.into()), 2.into());
         assert_eq!(chapter5_max(0.into(), 0.into()), 0.into());
-        assert_eq!(chapter5_max(Bit16::from(-1), Bit16::from(-2)), Bit16::from(-1));
+        assert_eq!(
+            chapter5_max(Bit16::from(-1), Bit16::from(-2)),
+            Bit16::from(-1)
+        );
     }
-
 }

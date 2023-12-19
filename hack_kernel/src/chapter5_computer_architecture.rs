@@ -198,7 +198,7 @@ impl Rom32KWriter {
 }
 
 /// The very very slow DataMemory, holding the RAM, Screen memory map, and Keyboard memory map.
-/// 
+///
 /// It takes >10s to scan through the screen memory map, so not used in [Computer]. See [crate] intro for details.
 pub struct DataMemory {
     state: alloc::vec::Vec<Ram16K>,
@@ -270,7 +270,7 @@ impl DataMemory {
 }
 
 /// The on-steroids memory. Used instead of [DataMemory].
-/// 
+///
 /// It's fast because it breaks the rules of the game. See [crate] into for details.
 pub struct CheatingDataMemory {
     state: alloc::vec::Vec<[bool; 16]>,

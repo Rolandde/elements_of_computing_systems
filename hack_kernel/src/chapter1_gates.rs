@@ -4,13 +4,13 @@
 //! As `NAND` is magically given, the Rust bitwise operations are used to construct the gate. All other
 //! gates did not use any Rust logic at all (assignment were used for code readability). The gates were
 //! implemented in order given in the book, which made puzzling them out easier.
-//! 
+//!
 //! ## Notes on using `bool` for 0 (`false`) and 1 (`true`)
-//! `bool` works, but `[bool; 8]` takes up 8 times as much space as `u8` if I understand 
+//! `bool` works, but `[bool; 8]` takes up 8 times as much space as `u8` if I understand
 //! [how much space types need](https://doc.rust-lang.org/core/mem/fn.size_of.html). I tried making u8
 //! work and the compiler would not let me. So this is why I like [bool; N]. Other reasons include:
-//! 
-//! * It's intuitive. A primitive type than can be in only two states. 
+//!
+//! * It's intuitive. A primitive type than can be in only two states.
 //! * Length is explicit. `bool`, `[bool; 4]`, `[bool; 8]` cannot be directly compared
 //!
 //! ## NOT Gate
@@ -138,7 +138,7 @@ pub fn and_multibit_gate(a: [bool; 16], b: [bool; 16]) -> [bool; 16] {
     ]
 }
 
-/// The divisive Demultiplexor gate. For output, if selector=0 then [input, 0] else [0, input]. 
+/// The divisive Demultiplexor gate. For output, if selector=0 then [input, 0] else [0, input].
 /// In words, put input in first or second position of output given the selector.
 ///
 /// # Examples
@@ -212,12 +212,11 @@ pub fn demultiplexor_4way_1bit_gate(a: bool, sel: [bool; 2]) -> [bool; 4] {
 /// assert_eq!(demultiplexor_8way_1bit_gate(true, [true, true, true]), [false, false, false, false, false, false, false, true]);
 /// ```
 ///
-pub fn demultiplexor_8way_1bit_gate(a: bool, sel: [bool; 3]) -> [bool; 8]{
+pub fn demultiplexor_8way_1bit_gate(a: bool, sel: [bool; 3]) -> [bool; 8] {
     let left_four_bit = and_gate(a, not_gate(sel[0]));
     let right_four_bit = and_gate(a, sel[0]);
     let left_four_solution = demultiplexor_4way_1bit_gate(left_four_bit, [sel[1], sel[2]]);
-    let right_four_solution =
-        demultiplexor_4way_1bit_gate(right_four_bit, [sel[1], sel[2]]);
+    let right_four_solution = demultiplexor_4way_1bit_gate(right_four_bit, [sel[1], sel[2]]);
     [
         left_four_solution[0],
         left_four_solution[1],
@@ -350,10 +349,8 @@ pub fn multiplexor_4way_16bit_gate(a: [[bool; 16]; 4], sel: [bool; 2]) -> [bool;
 /// assert_eq!(multiplexor_8way_16bit_gate(inputs, [true, true, true]), inputs[7]);
 ///
 pub fn multiplexor_8way_16bit_gate(a: [[bool; 16]; 8], sel: [bool; 3]) -> [bool; 16] {
-    let left_four_pick =
-        multiplexor_4way_16bit_gate([a[0], a[1], a[2], a[3]], [sel[1], sel[2]]);
-    let right_four_pick =
-        multiplexor_4way_16bit_gate([a[4], a[5], a[6], a[7]], [sel[1], sel[2]]);
+    let left_four_pick = multiplexor_4way_16bit_gate([a[0], a[1], a[2], a[3]], [sel[1], sel[2]]);
+    let right_four_pick = multiplexor_4way_16bit_gate([a[4], a[5], a[6], a[7]], [sel[1], sel[2]]);
     multiplexor_multibit_gate(left_four_pick, right_four_pick, sel[0])
 }
 
@@ -402,7 +399,6 @@ pub fn not_multibit_gate(a: [bool; 16]) -> [bool; 16] {
         not_gate(a[15]),
     ]
 }
-
 
 /// The lovely Or gate
 ///
@@ -482,10 +478,7 @@ pub fn or_multiway_gate(a: [bool; 8]) -> bool {
             a[1],
             or_gate(
                 a[2],
-                or_gate(
-                    a[3],
-                    or_gate(a[4], or_gate(a[5], or_gate(a[6], a[7]))),
-                ),
+                or_gate(a[3], or_gate(a[4], or_gate(a[5], or_gate(a[6], a[7])))),
             ),
         ),
     )
@@ -504,17 +497,14 @@ pub fn or_multiway_gate(a: [bool; 8]) -> bool {
 /// ```
 ///
 pub fn xor_gate(a: bool, b: bool) -> bool {
-    and_gate(
-        or_gate(a, b),
-        nand_gate(a, b),
-    )
+    and_gate(or_gate(a, b), nand_gate(a, b))
 }
 
 /// The mysterious Multibit XOR gate. Does the XOR operation at each position.
-/// 
+///
 /// This wasn't asked for in the book, but proved useful for Chapter 2. This gate makes it very easy
 /// to toggle a not gate but setting input bus to all 1s (if bus is all 0s, input won't be changed).
-/// 
+///
 /// # Examples
 ///
 /// ```

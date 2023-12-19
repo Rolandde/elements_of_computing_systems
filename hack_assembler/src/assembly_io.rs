@@ -4,14 +4,13 @@
 //!
 //! ## Why `i16` for line counting?
 //! The [hack_kernel::Computer] and the [ROM][hack_kernel::Rom32K] use a 15 bit address space. Although an .asm file (which is loaded in the ROM) could contain more lines than can be expressed by 15 bits (greater than 32767), the extra lines would not fit into the ROM. By using `i16` and starting from 0 (first bit is always 0), one gets a very convenient representation of a 15 bit address space. [crate::Bit15] contains a check for negative numbers, so will panic if integer overflow happens.
-//! 
+//!
 //! ## Why so many `Option`s?
 //! `None` represents nothing in the [Reader] buffer. This happens if no lines have been read or if EOF has been reached. It is possible to squint and avoid using `Option`. For example, [Reader::is_empty_line()] could be `false` rather than `None`. The advantage of that squint is that you don't have to deal with `Option` all the time (it is annoying). The disadvantage is that you don't have to deal with EOF explicitly. Even if there was a `is_eof()` function, it would be up to me to remember to check. `Option` forces that check, even if it is only to call `unwrap` (which, for the record, is not done). Explicit is better. The neat thing is that the `Option` design feeds in nicely into the [FirstPass][crate::assembly::FirstPass] and [SecondPass][crate::assembly::SecondPass] iterators.
 
 /// Low level reader of .asm files.
 ///
 /// If you want full control over reading. [crate::assembly::FirstPass] and [crate::assembly::SecondPass] offer simpler abstractions for parsing .asm files.
-
 use hack_interface;
 pub struct Reader<R> {
     inner: R,
@@ -119,7 +118,6 @@ impl<R: std::io::BufRead> Reader<R> {
             }
         }
     }
-
 
     /// Is the current line a command (A or C)
     ///
@@ -284,15 +282,21 @@ impl<R: std::io::BufRead> Reader<R> {
     /// ```
     pub fn parse_a_command(&self) -> Result<SplitACommand, hack_interface::Error> {
         let line = self.line;
-        let a = self.buffer.as_ref().ok_or(hack_interface::Error::ACommand(line))?;
-        let first = a.chars().next().ok_or(hack_interface::Error::ACommand(line))?;
+        let a = self
+            .buffer
+            .as_ref()
+            .ok_or(hack_interface::Error::ACommand(line))?;
+        let first = a
+            .chars()
+            .next()
+            .ok_or(hack_interface::Error::ACommand(line))?;
         if first != '@' {
             Err(hack_interface::Error::ACommand(line))
         } else {
             let s = a.get(1..).ok_or(hack_interface::Error::ACommand(line))?;
             match s.parse::<i16>() {
                 Ok(i) => Ok(SplitACommand::Address(hack_interface::Bit15::from(i))),
-                Err(_) => Ok(SplitACommand::Symbol(s.to_string()))  // TODO: Invalid symbol checking
+                Err(_) => Ok(SplitACommand::Symbol(s.to_string())), // TODO: Invalid symbol checking
             }
         }
     }
@@ -315,7 +319,10 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     pub fn parse_c_command(&self) -> Result<hack_interface::Bit16, hack_interface::Error> {
         let line = self.line;
-        let str_command = self.buffer.as_ref().ok_or(hack_interface::Error::CCommand(line))?;
+        let str_command = self
+            .buffer
+            .as_ref()
+            .ok_or(hack_interface::Error::CCommand(line))?;
         let (destination_str, rest) = match str_command.split_once("=") {
             Some((d, r)) => (Some(d), r),
             None => (None, str_command.as_ref()),
@@ -386,24 +393,23 @@ impl<R: std::io::BufRead> Reader<R> {
         }?;
 
         Ok(hack_interface::Bit16::from([
-                true,
-                true,
-                true,
-                a_flag,
-                command[0],
-                command[1],
-                command[2],
-                command[3],
-                command[4],
-                command[5],
-                destination[0],
-                destination[1],
-                destination[2],
-                jump[0],
-                jump[1],
-                jump[2],
-            ]
-        ))
+            true,
+            true,
+            true,
+            a_flag,
+            command[0],
+            command[1],
+            command[2],
+            command[3],
+            command[4],
+            command[5],
+            destination[0],
+            destination[1],
+            destination[2],
+            jump[0],
+            jump[1],
+            jump[2],
+        ]))
     }
 }
 
@@ -438,6 +444,138 @@ pub fn clean_line(line: &mut String) {
 pub enum SplitACommand {
     Address(hack_interface::Bit15),
     Symbol(String),
+}
+
+/// The comp part of the C instruction
+enum CComp {
+    Zero,
+    One,
+    MinumOne,
+    D,
+    A,
+    NotD,
+    NotA,
+    MinusD,
+    MinusA,
+    DPlusOne,
+    APlusOne,
+    DMinusOne,
+    AMinusOne,
+    DPlusA,
+    DMinusA,
+    AMinusD,
+    DAndA,
+    DOrA,
+    M,
+    NotM,
+    MinusM,
+    MPlusOne,
+    MMinusOne,
+    DPlusM,
+    DMinusM,
+    MMinusD,
+    DAndM,
+    DOrM,
+}
+
+impl CComp {
+    fn d_m_flag(self) -> bool {
+        match self {
+            CComp::Zero => false,
+            CComp::One => false,
+            CComp::MinumOne => false,
+            CComp::D => false,
+            CComp::A => false,
+            CComp::NotD => false,
+            CComp::NotA => false,
+            CComp::MinusD => false,
+            CComp::MinusA => false,
+            CComp::DPlusOne => false,
+            CComp::APlusOne => false,
+            CComp::DMinusOne => false,
+            CComp::AMinusOne => false,
+            CComp::DPlusA => false,
+            CComp::DMinusA => false,
+            CComp::AMinusD => false,
+            CComp::DAndA => false,
+            CComp::DOrA => false,
+            CComp::M => true,
+            CComp::NotM => true,
+            CComp::MinusM => true,
+            CComp::MPlusOne => true,
+            CComp::MMinusOne => true,
+            CComp::DPlusM => true,
+            CComp::DMinusM => true,
+            CComp::MMinusD => true,
+            CComp::DAndM => true,
+            CComp::DOrM => true,
+        }
+    }
+}
+
+impl std::str::FromStr for CComp {
+    type Err = (); // Informative error message happens during parsing
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "0" => Ok(Self::Zero),
+            "1" => Ok(Self::One),
+            "-1" => Ok(Self::MinumOne),
+            "D" => Ok(Self::D),
+            "A" => Ok(Self::A),
+            "!D" => Ok(Self::NotD),
+            "!A" => Ok(Self::NotA),
+            "-D" => Ok(Self::MinusD),
+            "-A" => Ok(Self::MinusA),
+            "D+1" => Ok(Self::DPlusOne),
+            "A+1" => Ok(Self::APlusOne),
+            "D-1" => Ok(Self::DMinusOne),
+            "A-1" => Ok(Self::AMinusOne),
+            "D+A" => Ok(Self::DPlusA),
+            "D-A" => Ok(Self::DMinusA),
+            "A-D" => Ok(Self::AMinusD),
+            "D&A" => Ok(Self::DAndA),
+            "D|A" => Ok(Self::DOrA),
+            "M" => Ok(Self::M),
+            "!M" => Ok(Self::NotM),
+            "-M" => Ok(Self::MinusM),
+            "M+1" => Ok(Self::MPlusOne),
+            "M-1" => Ok(Self::MMinusOne),
+            "D+M" => Ok(Self::DPlusM),
+            "D-M" => Ok(Self::DMinusM),
+            "M-D" => Ok(Self::MMinusD),
+            "D&M" => Ok(Self::DAndM),
+            "D|M" => Ok(Self::DOrM),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::convert::From<CComp> for [bool; 7] {
+    fn from(value: CComp) -> Self {
+        let c = match value {
+            CComp::Zero => hack_kernel::arithmetic::ALU_ZERO,
+            CComp::One => hack_kernel::arithmetic::ALU_ONE,
+            CComp::MinumOne => hack_kernel::arithmetic::ALU_MINUS_ONE,
+            CComp::D => hack_kernel::arithmetic::ALU_X,
+            CComp::A | CComp::M => hack_kernel::arithmetic::ALU_Y,
+            CComp::NotD => hack_kernel::arithmetic::ALU_X_NOT,
+            CComp::NotA | CComp::NotM => hack_kernel::arithmetic::ALU_Y_NOT,
+            CComp::MinusD => hack_kernel::arithmetic::ALU_X_MINUS,
+            CComp::MinusA | CComp::MinusM => hack_kernel::arithmetic::ALU_Y_MINUS,
+            CComp::DPlusOne => hack_kernel::arithmetic::ALU_X_PLUS1,
+            CComp::APlusOne | CComp::MPlusOne => hack_kernel::arithmetic::ALU_Y_PLUS1,
+            CComp::DMinusOne => hack_kernel::arithmetic::ALU_X_MINUS1,
+            CComp::AMinusOne | CComp::MMinusOne => hack_kernel::arithmetic::ALU_Y_MINUS1,
+            CComp::DPlusA | CComp::DPlusM => hack_kernel::arithmetic::ALU_X_PLUS_Y,
+            CComp::DMinusA | CComp::DMinusM => hack_kernel::arithmetic::ALU_X_MINUS_Y,
+            CComp::AMinusD | CComp::MMinusD => hack_kernel::arithmetic::ALU_Y_MINUS_X,
+            CComp::DAndA | CComp::DAndM => hack_kernel::arithmetic::ALU_X_AND_Y,
+            CComp::DOrA | CComp::DOrM => hack_kernel::arithmetic::ALU_X_OR_Y,
+        };
+
+        [value.d_m_flag(), c[0], c[1], c[2], c[3], c[4], c[5]]
+    }
 }
 
 mod assembly_io_tests {

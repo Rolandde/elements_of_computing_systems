@@ -101,9 +101,9 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 
     /// Returns error if buffer does not have the expected number of fields (command + args).
-    /// 
+    ///
     /// If nothing is in the buffer, returns `Ok`.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader};
@@ -128,9 +128,9 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 
     /// Parse the segment and index arg of a push or pop command.
-    /// 
+    ///
     /// This assumes the line is at an push or pop command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Segment};
@@ -158,9 +158,9 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 
     /// Parse the symbol arg.
-    /// 
+    ///
     /// Assumes the line has a symbol as the first arg.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::Reader;
@@ -171,7 +171,9 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Ok::<(), hack_virtual_machine::Error>(())
     pub fn parse_args_symbol(&self) -> Result<Option<&String>, crate::Error> {
         if let Some(buf) = &self.buffer {
-            Ok(Some(buf.get(1).ok_or(crate::Error::InvalidArgs(self.line))?))
+            Ok(Some(
+                buf.get(1).ok_or(crate::Error::InvalidArgs(self.line))?,
+            ))
         } else {
             Ok(None)
         }
@@ -180,7 +182,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// Parse an arithmetic command.
     ///
     /// This assumes the line is at the arithmetic command specified to the function.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Command, Arithmetic};
@@ -196,14 +198,14 @@ impl<R: std::io::BufRead> Reader<R> {
         self.error_buffer_len(1)?;
         match &self.buffer {
             Some(_) => Ok(Some(Command::Arithmetic(kind))),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
     /// Parse a goto command.
     ///
     /// Assumes line is at a goto command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Command};
@@ -216,14 +218,14 @@ impl<R: std::io::BufRead> Reader<R> {
         self.error_buffer_len(2)?;
         match self.parse_args_symbol()? {
             Some(s) => Ok(Some(Command::Goto(s.to_owned()))),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
     /// Parse a if command.
     ///
     /// Assumes line is at a if command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Command};
@@ -236,14 +238,14 @@ impl<R: std::io::BufRead> Reader<R> {
         self.error_buffer_len(2)?;
         match self.parse_args_symbol()? {
             Some(s) => Ok(Some(Command::If(s.to_owned()))),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
     /// Parse a label command.
     ///
     /// Assumes line is at a label command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Command};
@@ -256,14 +258,14 @@ impl<R: std::io::BufRead> Reader<R> {
         self.error_buffer_len(2)?;
         match self.parse_args_symbol()? {
             Some(s) => Ok(Some(Command::Label(s.to_owned()))),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
     /// Parse the pop command.
-    /// 
+    ///
     /// Assumes the line is on a pop command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Command, Segment};
@@ -282,9 +284,9 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 
     /// Parse the push command.
-    /// 
+    ///
     /// Assumes the line is on a push command.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hack_virtual_machine::reader::{Reader, Command, Segment};

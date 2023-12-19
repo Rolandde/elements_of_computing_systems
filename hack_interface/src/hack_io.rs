@@ -95,16 +95,16 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for Instructions<'a, R> {
 
 /// Write [crate::Bit16] as the 0 and 1 representation.
 pub struct Writer<W> {
-    inner: W
+    inner: W,
 }
 
 impl<W: std::io::Write> Writer<W> {
     pub fn new(inner: W) -> Self {
-        Self {inner}
+        Self { inner }
     }
 
     /// Write a single instruction
-    /// 
+    ///
     /// # Examples
     /// ```
     /// let mut w = hack_interface::hack_io::Writer::new(Vec::new());

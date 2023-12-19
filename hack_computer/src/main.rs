@@ -6,7 +6,7 @@ const WIDTH: usize = 512;
 const HEIGHT: usize = 256;
 
 fn main() {
-    let mut args =  std::env::args();
+    let mut args = std::env::args();
     args.next(); // Program name
     let file = args.next().expect("No file specified");
     let rom = hack_interface::hack_io::write_rom_from_file(file);
@@ -41,8 +41,6 @@ fn main() {
         }
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
-        window
-            .update_with_buffer(&buffer, WIDTH, HEIGHT)
-            .unwrap();
+        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
 }

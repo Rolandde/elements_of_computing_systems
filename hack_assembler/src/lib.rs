@@ -1,11 +1,10 @@
 //! Assembler that converts from `.asm` assembly format to `.hack` machine instructions format.
-//! 
+//!
 //! You probably want to use [assemble_from_bytes] or [assemble_from_file].
 //!
 //! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
 
 pub mod assembly_io;
-
 
 /// An iterator over the assembly labels and the commands they point to.
 ///
@@ -281,7 +280,7 @@ pub struct LabelAddress {
 }
 
 /// Two pass assembly from a byte source.
-/// 
+///
 /// # Examples
 /// ```
 /// let asm = b"
@@ -307,9 +306,8 @@ pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interf
     Ok(SecondPass::new(from, symbol_table))
 }
 
-
 /// Two pass assembly from a `.asm` file.
-/// 
+///
 /// # Examples
 /// ```
 /// let mut d = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -373,7 +371,7 @@ mod book_tests {
         ";
         let mut machine_code = hack_interface::hack_io::Writer::new(Vec::new());
         for bit16 in crate::assemble_from_bytes(&asm[..])? {
-             machine_code.write_instruction(&bit16?)?;
+            machine_code.write_instruction(&bit16?)?;
         }
         assert_eq!(TWO_PLUS_THREE.as_bytes(), machine_code.as_ref());
 

@@ -12,7 +12,9 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidArgs(line) => write!(f, "wrong number or type or arguments on line {}", line),
+            Self::InvalidArgs(line) => {
+                write!(f, "wrong number or type or arguments on line {}", line)
+            }
             Self::Io(e) => write!(f, "cannot read: {}", e),
             Self::UnknownCommand(line) => write!(f, "unknown command on line {}", line),
         }
