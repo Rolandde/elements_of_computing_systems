@@ -307,109 +307,28 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
+    /// use hack_assembler::assembly_io::{CCommand, CDest, CComp, CJump};
     /// let rom = b"M=D+A;JGE";
     /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_c_command()?,
-    ///     "1110000010001011".parse()?
+    ///     CCommand::new(CDest::M, CComp::DPlusA, CJump::GreaterEqual)
     /// );
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
     ///
-    pub fn parse_c_command(&self) -> Result<hack_interface::Bit16, hack_interface::Error> {
+    pub fn parse_c_command(&self) -> Result<CCommand, hack_interface::Error> {
         let line = self.line;
         let str_command = self
             .buffer
             .as_ref()
             .ok_or(hack_interface::Error::CCommand(line))?;
-        let (destination_str, rest) = match str_command.split_once("=") {
-            Some((d, r)) => (Some(d), r),
-            None => (None, str_command.as_ref()),
-        };
-        let destination = if let Some(d) = destination_str {
-            match d {
-                "M" => Ok([false, false, true]),
-                "D" => Ok([false, true, false]),
-                "MD" => Ok([false, true, true]),
-                "A" => Ok([true, false, false]),
-                "AM" => Ok([true, false, true]),
-                "AD" => Ok([true, true, false]),
-                "AMD" => Ok([true, true, true]),
-                _ => Err(hack_interface::Error::CCommand(line)),
-            }
-        } else {
-            Ok([false, false, false])
-        }?;
 
-        let (command_str, jump_str) = match rest.split_once(";") {
-            Some((c, j)) => (c, Some(j)),
-            None => (rest, None),
-        };
-
-        let jump = if let Some(j) = jump_str {
-            match j {
-                "JGT" => Ok([false, false, true]),
-                "JEQ" => Ok([false, true, false]),
-                "JGE" => Ok([false, true, true]),
-                "JLT" => Ok([true, false, false]),
-                "JNE" => Ok([true, false, true]),
-                "JLE" => Ok([true, true, false]),
-                "JMP" => Ok([true, true, true]),
-                _ => Err(hack_interface::Error::CCommand(line)),
-            }
-        } else {
-            Ok([false, false, false])
-        }?;
-
-        // 0 a_flag also happens if there is no "A" string (such as 0;JMP)
-        let a_flag = if command_str.contains("M") {
-            true
-        } else {
-            false
-        };
-        // Allocate a new string (bad), but cut down on comparisons (good)
-        let a_command = command_str.replace("M", "A");
-        let command = match a_command.as_ref() {
-            "0" => Ok(hack_kernel::arithmetic::ALU_ZERO),
-            "1" => Ok(hack_kernel::arithmetic::ALU_ONE),
-            "-1" => Ok(hack_kernel::arithmetic::ALU_MINUS_ONE),
-            "D" => Ok(hack_kernel::arithmetic::ALU_X),
-            "A" => Ok(hack_kernel::arithmetic::ALU_Y),
-            "!D" => Ok(hack_kernel::arithmetic::ALU_X_NOT),
-            "!A" => Ok(hack_kernel::arithmetic::ALU_Y_NOT),
-            "-D" => Ok(hack_kernel::arithmetic::ALU_X_MINUS),
-            "-A" => Ok(hack_kernel::arithmetic::ALU_Y_MINUS),
-            "D+1" => Ok(hack_kernel::arithmetic::ALU_X_PLUS1),
-            "A+1" => Ok(hack_kernel::arithmetic::ALU_Y_PLUS1),
-            "D-1" => Ok(hack_kernel::arithmetic::ALU_X_MINUS1),
-            "A-1" => Ok(hack_kernel::arithmetic::ALU_Y_MINUS1),
-            "D+A" => Ok(hack_kernel::arithmetic::ALU_X_PLUS_Y),
-            "D-A" => Ok(hack_kernel::arithmetic::ALU_X_MINUS_Y),
-            "A-D" => Ok(hack_kernel::arithmetic::ALU_Y_MINUS_X),
-            "D&A" => Ok(hack_kernel::arithmetic::ALU_X_AND_Y),
-            "D|A" => Ok(hack_kernel::arithmetic::ALU_X_OR_Y),
-            _ => Err(hack_interface::Error::CCommand(line)),
-        }?;
-
-        Ok(hack_interface::Bit16::from([
-            true,
-            true,
-            true,
-            a_flag,
-            command[0],
-            command[1],
-            command[2],
-            command[3],
-            command[4],
-            command[5],
-            destination[0],
-            destination[1],
-            destination[2],
-            jump[0],
-            jump[1],
-            jump[2],
-        ]))
+        match str_command.parse() {
+            Ok(c) => Ok(c),
+            Err(()) => Err(hack_interface::Error::CCommand(line)),
+        }
     }
 }
 
@@ -447,7 +366,8 @@ pub enum SplitACommand {
 }
 
 /// The comp part of the C instruction
-enum CComp {
+#[derive(Debug, PartialEq, Eq)]
+pub enum CComp {
     Zero,
     One,
     MinumOne,
@@ -479,7 +399,8 @@ enum CComp {
 }
 
 impl CComp {
-    fn d_m_flag(self) -> bool {
+    /// The first bit of the comp instruction. Is A register a value or a memory address?
+    fn a_m_flag(self) -> bool {
         match self {
             CComp::Zero => false,
             CComp::One => false,
@@ -574,19 +495,187 @@ impl std::convert::From<CComp> for [bool; 7] {
             CComp::DOrA | CComp::DOrM => hack_kernel::arithmetic::ALU_X_OR_Y,
         };
 
-        [value.d_m_flag(), c[0], c[1], c[2], c[3], c[4], c[5]]
+        [value.a_m_flag(), c[0], c[1], c[2], c[3], c[4], c[5]]
     }
 }
 
+/// The destination part of the C command
+#[derive(Debug, PartialEq, Eq)]
+pub enum CDest {
+    Null,
+    M,
+    D,
+    MD,
+    A,
+    AM,
+    AD,
+    AMD,
+}
+
+impl std::str::FromStr for CDest {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "" => Ok(CDest::Null),
+            "M" => Ok(CDest::M),
+            "D" => Ok(CDest::D),
+            "MD" => Ok(CDest::MD),
+            "A" => Ok(CDest::A),
+            "AM" => Ok(CDest::AM),
+            "AD" => Ok(CDest::AD),
+            "AMD" => Ok(CDest::AMD),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::convert::From<CDest> for [bool; 3] {
+    fn from(value: CDest) -> Self {
+        match value {
+            CDest::Null => [false, false, false],
+            CDest::M => [false, false, true],
+            CDest::D => [false, true, false],
+            CDest::MD => [false, true, true],
+            CDest::A => [true, false, false],
+            CDest::AM => [true, false, true],
+            CDest::AD => [true, true, false],
+            CDest::AMD => [true, true, true],
+        }
+    }
+}
+
+/// The jump part of the C command
+#[derive(Debug, PartialEq, Eq)]
+pub enum CJump {
+    Null,
+    Greater,
+    Equal,
+    GreaterEqual,
+    Less,
+    NotEqual,
+    LessEqual,
+    Jump,
+}
+
+impl std::str::FromStr for CJump {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "" => Ok(CJump::Null),
+            "JGT" => Ok(CJump::Greater),
+            "JEQ" => Ok(CJump::Equal),
+            "JGE" => Ok(CJump::GreaterEqual),
+            "JLT" => Ok(CJump::Less),
+            "JNE" => Ok(CJump::NotEqual),
+            "JLE" => Ok(CJump::LessEqual),
+            "JMP" => Ok(CJump::Jump),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::convert::From<CJump> for [bool; 3] {
+    fn from(value: CJump) -> Self {
+        match value {
+            CJump::Null => [false, false, false],
+            CJump::Greater => [false, false, true],
+            CJump::Equal => [false, true, false],
+            CJump::GreaterEqual => [false, true, true],
+            CJump::Less => [true, false, false],
+            CJump::NotEqual => [true, false, true],
+            CJump::LessEqual => [true, true, false],
+            CJump::Jump => [true, true, true],
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct CCommand {
+    dest: CDest,
+    comp: CComp,
+    jump: CJump,
+}
+
+impl CCommand {
+    pub fn new(dest: CDest, comp: CComp, jump: CJump) -> Self {
+        CCommand { dest, comp, jump }
+    }
+}
+
+impl std::str::FromStr for CCommand {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (destination_str, rest) = match s.split_once("=") {
+            Some((d, r)) => (Some(d), r),
+            None => (None, s),
+        };
+
+        let dest = match destination_str {
+            Some(d) => d.parse()?,
+            None => CDest::Null,
+        };
+
+        let (command_str, jump_str) = match rest.split_once(";") {
+            Some((c, j)) => (c, Some(j)),
+            None => (rest, None),
+        };
+
+        let comp = command_str.parse()?;
+
+        let jump = match jump_str {
+            Some(j) => j.parse()?,
+            None => CJump::Null,
+        };
+
+        Ok(CCommand { dest, comp, jump })
+    }
+}
+
+impl std::convert::From<CCommand> for hack_interface::Bit16 {
+    fn from(value: CCommand) -> Self {
+        let dest = <[bool; 3]>::from(value.dest);
+        let comp = <[bool; 7]>::from(value.comp);
+        let jump = <[bool; 3]>::from(value.jump);
+
+        hack_interface::Bit16::from([
+            true, true, true, comp[0], comp[1], comp[2], comp[3], comp[4], comp[5], comp[6],
+            dest[0], dest[1], dest[2], jump[0], jump[1], jump[2],
+        ])
+    }
+}
+
+#[cfg(test)]
 mod assembly_io_tests {
+    use super::*;
     #[test]
     fn test_parse_c_command() -> Result<(), hack_interface::Error> {
         let rom = b"!A;JMP\nD=M-D";
-        let mut reader = crate::assembly_io::Reader::new(&rom[..]);
+        let mut reader = Reader::new(&rom[..]);
         reader.read_line()?;
-        assert_eq!(reader.parse_c_command()?, "1110110001000111".parse()?);
+        let mut c = reader.parse_c_command()?;
+        assert_eq!(
+            c,
+            CCommand {
+                dest: CDest::Null,
+                comp: CComp::NotA,
+                jump: CJump::Jump
+            }
+        );
+        assert_eq!(hack_interface::Bit16::from(c), "1110110001000111".parse()?);
         reader.read_line()?;
-        assert_eq!(reader.parse_c_command()?, "1111000111010000".parse()?);
+        c = reader.parse_c_command()?;
+        assert_eq!(
+            c,
+            CCommand {
+                dest: CDest::D,
+                comp: CComp::MMinusD,
+                jump: CJump::Null
+            }
+        );
+        assert_eq!(hack_interface::Bit16::from(c), "1111000111010000".parse()?);
         Ok(())
     }
 
@@ -596,11 +685,38 @@ mod assembly_io_tests {
         let rom = b"0;JMP\nA;JMP\nM;JMP";
         let mut reader = crate::assembly_io::Reader::new(&rom[..]);
         reader.read_line()?;
-        assert_eq!(reader.parse_c_command()?, "1110101010000111".parse()?);
+        let mut c = reader.parse_c_command()?;
+        assert_eq!(
+            c,
+            CCommand {
+                dest: CDest::Null,
+                comp: CComp::Zero,
+                jump: CJump::Jump
+            }
+        );
+        assert_eq!(hack_interface::Bit16::from(c), "1110101010000111".parse()?);
         reader.read_line()?;
-        assert_eq!(reader.parse_c_command()?, "1110110000000111".parse()?);
+        c = reader.parse_c_command()?;
+        assert_eq!(
+            c,
+            CCommand {
+                dest: CDest::Null,
+                comp: CComp::A,
+                jump: CJump::Jump
+            }
+        );
+        assert_eq!(hack_interface::Bit16::from(c), "1110110000000111".parse()?);
         reader.read_line()?;
-        assert_eq!(reader.parse_c_command()?, "1111110000000111".parse()?);
+        c = reader.parse_c_command()?;
+        assert_eq!(
+            c,
+            CCommand {
+                dest: CDest::Null,
+                comp: CComp::M,
+                jump: CJump::Jump
+            }
+        );
+        assert_eq!(hack_interface::Bit16::from(c), "1111110000000111".parse()?);
         Ok(())
     }
 }

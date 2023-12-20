@@ -223,7 +223,11 @@ impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
             };
 
             if c_command {
-                break Some(self.inner.parse_c_command());
+                break Some(
+                    self.inner
+                        .parse_c_command()
+                        .map(|ok| hack_interface::Bit16::from(ok)),
+                );
             } else {
                 break Some(self.parse_a_command());
             }
