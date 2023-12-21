@@ -9,10 +9,6 @@ edition = "2018"
 name = "hack_assembler"
 path = "src/lib.rs"
 
-[[bin]]
-name = "hack_assembler"
-path = "src/main.rs"
-
 [dependencies]
 hack_kernel = {path = "../hack_kernel"}
 hack_interface = {path = "../hack_interface"}
