@@ -28,6 +28,23 @@ pub enum Segment {
     Temp,
 }
 
+impl std::str::FromStr for Segment {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "argument" => Ok(Segment::Argument),
+            "local" => Ok(Segment::Local),
+            "static" => Ok(Segment::Static),
+            "constant" => Ok(Segment::Constant),
+            "this" => Ok(Segment::This),
+            "that" => Ok(Segment::That),
+            "pointer" => Ok(Segment::Pointer),
+            "temp" => Ok(Segment::Temp),
+            _ => Err(()),
+        }
+    }
+}
+
 /// Errors during VM functioning
 #[derive(Debug)]
 pub enum Error {

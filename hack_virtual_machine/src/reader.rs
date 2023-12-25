@@ -1,6 +1,6 @@
 //! Reader for .vm files.
 
-use crate::{Command, Error, Segment};
+use crate::{Command, Error};
 
 /// Reader that converts .vm files into [Command]s.
 ///
@@ -205,23 +205,6 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 }
 
-impl std::str::FromStr for Segment {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "argument" => Ok(Segment::Argument),
-            "local" => Ok(Segment::Local),
-            "static" => Ok(Segment::Static),
-            "constant" => Ok(Segment::Constant),
-            "this" => Ok(Segment::This),
-            "that" => Ok(Segment::That),
-            "pointer" => Ok(Segment::Pointer),
-            "temp" => Ok(Segment::Temp),
-            _ => Err(()),
-        }
-    }
-}
-
 /// Remove leading and trailing whitespace and any comment characters. May leave an empty string.
 ///
 /// Comment characters are those following `"//"` (including itself).
@@ -247,4 +230,40 @@ pub fn clean_line(line: &mut String) {
     let no_white_space = no_comments.trim();
     line.clear();
     line.push_str(no_white_space);
+}
+
+#[cfg(test)]
+mod vm_parser_tests {
+    use super::*;
+
+    #[test]
+    fn test_empty() -> Result<(), Error> {
+        let input = b"\n//Empty\n     \n";
+        let mut reader = Reader::new(&input[..]);
+        assert_eq!(0, reader.read_command()?);
+        reader = Reader::new(b"");
+        assert_eq!(0, reader.read_command()?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_algorithm() -> Result<(), Error> {
+        let input = b"sub";
+        let mut reader = Reader::new(&input[..]);
+        reader.read_command()?;
+        assert_eq!(reader.parse_command()?, Command::Subtract);
+        Ok(())
+    }
+
+    #[test]
+    fn test_segment() -> Result<(), Error> {
+        let input = b"push local 3";
+        let mut reader = Reader::new(&input[..]);
+        reader.read_command()?;
+        assert_eq!(
+            reader.parse_command()?,
+            Command::Push(crate::Segment::Local, 3)
+        );
+        Ok(())
+    }
 }
