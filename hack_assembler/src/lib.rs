@@ -244,31 +244,120 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn new() -> Self {
+        type RS = ReservedSymbols;
         let mut h = std::collections::HashMap::new();
-        h.insert("SP".to_string(), 0.into());
-        h.insert("LCL".to_string(), 1.into());
-        h.insert("ARG".to_string(), 2.into());
-        h.insert("THIS".to_string(), 3.into());
-        h.insert("THAT".to_string(), 4.into());
-        h.insert("R0".to_string(), 0.into());
-        h.insert("R1".to_string(), 1.into());
-        h.insert("R2".to_string(), 2.into());
-        h.insert("R3".to_string(), 3.into());
-        h.insert("R4".to_string(), 4.into());
-        h.insert("R5".to_string(), 5.into());
-        h.insert("R6".to_string(), 6.into());
-        h.insert("R7".to_string(), 7.into());
-        h.insert("R8".to_string(), 8.into());
-        h.insert("R9".to_string(), 9.into());
-        h.insert("R10".to_string(), 10.into());
-        h.insert("R11".to_string(), 11.into());
-        h.insert("R12".to_string(), 12.into());
-        h.insert("R13".to_string(), 13.into());
-        h.insert("R14".to_string(), 14.into());
-        h.insert("R15".to_string(), 15.into());
-        h.insert("SCREEN".to_string(), 16385.into());
-        h.insert("KBD".to_string(), 24576.into());
+        h.insert(RS::SP.to_string(), RS::SP.into());
+        h.insert(RS::LCL.to_string(), RS::LCL.into());
+        h.insert(RS::ARG.to_string(), RS::ARG.into());
+        h.insert(RS::THIS.to_string(), RS::THIS.into());
+        h.insert(RS::THAT.to_string(), RS::THAT.into());
+        h.insert(RS::R0.to_string(), RS::R0.into());
+        h.insert(RS::R1.to_string(), RS::R1.into());
+        h.insert(RS::R2.to_string(), RS::R2.into());
+        h.insert(RS::R3.to_string(), RS::R3.into());
+        h.insert(RS::R4.to_string(), RS::R4.into());
+        h.insert(RS::R5.to_string(), RS::R5.into());
+        h.insert(RS::R6.to_string(), RS::R6.into());
+        h.insert(RS::R7.to_string(), RS::R7.into());
+        h.insert(RS::R8.to_string(), RS::R8.into());
+        h.insert(RS::R9.to_string(), RS::R9.into());
+        h.insert(RS::R10.to_string(), RS::R10.into());
+        h.insert(RS::R11.to_string(), RS::R11.into());
+        h.insert(RS::R12.to_string(), RS::R12.into());
+        h.insert(RS::R13.to_string(), RS::R13.into());
+        h.insert(RS::R14.to_string(), RS::R14.into());
+        h.insert(RS::R15.to_string(), RS::R15.into());
+        h.insert(RS::SCREEN.to_string(), RS::SCREEN.into());
+        h.insert(RS::KBD.to_string(), RS::KBD.into());
         Self { inner: h }
+    }
+}
+
+pub enum ReservedSymbols {
+    SP,
+    LCL,
+    ARG,
+    THIS,
+    THAT,
+    R0,
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    R6,
+    R7,
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
+    SCREEN,
+    KBD,
+}
+
+impl std::fmt::Display for ReservedSymbols {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ReservedSymbols::SP => "SP",
+            ReservedSymbols::LCL => "LCL",
+            ReservedSymbols::ARG => "ARG",
+            ReservedSymbols::THIS => "THIS",
+            ReservedSymbols::THAT => "THAT",
+            ReservedSymbols::R0 => "R0",
+            ReservedSymbols::R1 => "R1",
+            ReservedSymbols::R2 => "R2",
+            ReservedSymbols::R3 => "R3",
+            ReservedSymbols::R4 => "R4",
+            ReservedSymbols::R5 => "R5",
+            ReservedSymbols::R6 => "R6",
+            ReservedSymbols::R7 => "R7",
+            ReservedSymbols::R8 => "R8",
+            ReservedSymbols::R9 => "R9",
+            ReservedSymbols::R10 => "R10",
+            ReservedSymbols::R11 => "R11",
+            ReservedSymbols::R12 => "R12",
+            ReservedSymbols::R13 => "R13",
+            ReservedSymbols::R14 => "R14",
+            ReservedSymbols::R15 => "R15",
+            ReservedSymbols::SCREEN => "SCREEN",
+            ReservedSymbols::KBD => "KBD",
+        };
+
+        write!(f, "{}", s)
+    }
+}
+
+impl std::convert::From<ReservedSymbols> for hack_interface::Bit15 {
+    fn from(value: ReservedSymbols) -> Self {
+        match value {
+            ReservedSymbols::SP => 0.into(),
+            ReservedSymbols::LCL => 1.into(),
+            ReservedSymbols::ARG => 2.into(),
+            ReservedSymbols::THIS => 3.into(),
+            ReservedSymbols::THAT => 4.into(),
+            ReservedSymbols::R0 => 0.into(),
+            ReservedSymbols::R1 => 1.into(),
+            ReservedSymbols::R2 => 2.into(),
+            ReservedSymbols::R3 => 3.into(),
+            ReservedSymbols::R4 => 4.into(),
+            ReservedSymbols::R5 => 5.into(),
+            ReservedSymbols::R6 => 6.into(),
+            ReservedSymbols::R7 => 7.into(),
+            ReservedSymbols::R8 => 8.into(),
+            ReservedSymbols::R9 => 9.into(),
+            ReservedSymbols::R10 => 10.into(),
+            ReservedSymbols::R11 => 11.into(),
+            ReservedSymbols::R12 => 12.into(),
+            ReservedSymbols::R13 => 13.into(),
+            ReservedSymbols::R14 => 14.into(),
+            ReservedSymbols::R15 => 15.into(),
+            ReservedSymbols::SCREEN => 16385.into(),
+            ReservedSymbols::KBD => 24576.into(),
+        }
     }
 }
 
@@ -336,6 +425,8 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     buf = std::io::BufReader::new(f);
     Ok(SecondPass::new(buf, symbol_table))
 }
+
+pub use assembly_io::{CCommand, CComp, CDest, CJump};
 
 #[cfg(test)]
 mod assembly_tests {
