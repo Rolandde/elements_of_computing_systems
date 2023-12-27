@@ -12,6 +12,7 @@
 ///
 /// If you want full control over reading. [crate::assembly::FirstPass] and [crate::assembly::SecondPass] offer simpler abstractions for parsing .asm files.
 use hack_interface;
+
 pub struct Reader<R> {
     inner: R,
     buffer: Option<String>,
@@ -232,6 +233,9 @@ impl<R: std::io::BufRead> Reader<R> {
 
     /// Parses the label on the current line.
     ///
+    /// A label does not start with a number, only includes alphanumeric, `_`, `.`, `$`, and `:` characters.
+    /// A label cannot be a reserved symbol.
+    ///
     /// This assumes the current line is a label.
     ///
     /// # Examples
@@ -246,12 +250,23 @@ impl<R: std::io::BufRead> Reader<R> {
     /// ```
     pub fn parse_label(&self) -> Result<Option<String>, hack_interface::Error> {
         if let Some(a) = &self.buffer {
-            if !a.starts_with('(') || !a.ends_with(')') {
+            let s = a
+                .get(1..a.len() - 1)
+                .ok_or(hack_interface::Error::AssemblyLabel(self.line))?;
+            if s.chars()
+                .nth(0)
+                .ok_or(hack_interface::Error::AssemblyLabel(self.line))?
+                .is_numeric()
+            {
+                Err(hack_interface::Error::AssemblyLabel(self.line))
+            } else if !s
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '$' || c == ':')
+            {
+                Err(hack_interface::Error::AssemblyLabel(self.line))
+            } else if crate::ReservedSymbols::is_reserved(s) {
                 Err(hack_interface::Error::AssemblyLabel(self.line))
             } else {
-                let s = a
-                    .get(1..a.len() - 1)
-                    .ok_or(hack_interface::Error::AssemblyLabel(self.line))?;
                 Ok(Some(s.to_string()))
             }
         } else {
@@ -265,22 +280,29 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// let rom = b"@100\n@Symbol";
+    /// use hack_assembler::assembly_io::ACommand;
+    /// let rom = b"@100\n@Symbol\n@SP";
     /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
-    ///     hack_assembler::assembly_io::SplitACommand::Address("000000001100100".parse()?)
+    ///     ACommand::Address(100)
     /// );
     ///
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
-    ///     hack_assembler::assembly_io::SplitACommand::Symbol("Symbol".to_string())
+    ///     ACommand::Symbol("Symbol".to_string())
+    /// );
+    /// reader.read_line()?;
+    /// assert_eq!(
+    ///     reader.parse_a_command()?,
+    ///     ACommand::Reserved(hack_assembler::ReservedSymbols::SP)
     /// );
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn parse_a_command(&self) -> Result<SplitACommand, hack_interface::Error> {
+    pub fn parse_a_command(&self) -> Result<ACommand, hack_interface::Error> {
+        use std::convert::TryInto;
         let line = self.line;
         let a = self
             .buffer
@@ -295,8 +317,17 @@ impl<R: std::io::BufRead> Reader<R> {
         } else {
             let s = a.get(1..).ok_or(hack_interface::Error::ACommand(line))?;
             match s.parse::<i16>() {
-                Ok(i) => Ok(SplitACommand::Address(hack_interface::Bit15::from(i))),
-                Err(_) => Ok(SplitACommand::Symbol(s.to_string())), // TODO: Invalid symbol checking
+                Ok(i) => Ok(ACommand::Address(i)),
+                Err(_) => {
+                    match s.try_into() {
+                        Ok(r) => Ok(ACommand::Reserved(r)),
+                        Err(_) => {
+                            // Validation happens at label parsing
+                            // Invalid A command symbols are allowed, as they can't reference labels
+                            Ok(ACommand::Symbol(s.to_string()))
+                        }
+                    }
+                }
             }
         }
     }
@@ -358,10 +389,11 @@ pub fn clean_line(line: &mut String) {
     line.push_str(&no_comments);
 }
 
-/// A parsed A-command can be either an address or a symbol
+/// A parsed A-command can be either an address, a reserved symbol, or a user defined symbol
 #[derive(Debug, PartialEq, Eq)]
-pub enum SplitACommand {
-    Address(hack_interface::Bit15),
+pub enum ACommand {
+    Address(i16),
+    Reserved(crate::ReservedSymbols),
     Symbol(String),
 }
 
