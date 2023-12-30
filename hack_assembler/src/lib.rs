@@ -383,6 +383,47 @@ impl std::convert::From<ReservedSymbols> for hack_interface::Bit15 {
     }
 }
 
+pub enum Command {
+    A(ACommand),
+    C(CCommand),
+}
+
+impl std::convert::From<ReservedSymbols> for Command {
+    fn from(value: ReservedSymbols) -> Self {
+        match value {
+            ReservedSymbols::SP => Self::A(ACommand::Reserved(ReservedSymbols::SP)),
+            ReservedSymbols::LCL => Self::A(ACommand::Reserved(ReservedSymbols::LCL)),
+            ReservedSymbols::ARG => Self::A(ACommand::Reserved(ReservedSymbols::ARG)),
+            ReservedSymbols::THIS => Self::A(ACommand::Reserved(ReservedSymbols::THIS)),
+            ReservedSymbols::THAT => Self::A(ACommand::Reserved(ReservedSymbols::THAT)),
+            ReservedSymbols::R0 => Self::A(ACommand::Reserved(ReservedSymbols::R0)),
+            ReservedSymbols::R1 => Self::A(ACommand::Reserved(ReservedSymbols::R1)),
+            ReservedSymbols::R2 => Self::A(ACommand::Reserved(ReservedSymbols::R2)),
+            ReservedSymbols::R3 => Self::A(ACommand::Reserved(ReservedSymbols::R3)),
+            ReservedSymbols::R4 => Self::A(ACommand::Reserved(ReservedSymbols::R4)),
+            ReservedSymbols::R5 => Self::A(ACommand::Reserved(ReservedSymbols::R5)),
+            ReservedSymbols::R6 => Self::A(ACommand::Reserved(ReservedSymbols::R6)),
+            ReservedSymbols::R7 => Self::A(ACommand::Reserved(ReservedSymbols::R7)),
+            ReservedSymbols::R8 => Self::A(ACommand::Reserved(ReservedSymbols::R8)),
+            ReservedSymbols::R9 => Self::A(ACommand::Reserved(ReservedSymbols::R9)),
+            ReservedSymbols::R10 => Self::A(ACommand::Reserved(ReservedSymbols::R10)),
+            ReservedSymbols::R11 => Self::A(ACommand::Reserved(ReservedSymbols::R11)),
+            ReservedSymbols::R12 => Self::A(ACommand::Reserved(ReservedSymbols::R12)),
+            ReservedSymbols::R13 => Self::A(ACommand::Reserved(ReservedSymbols::R13)),
+            ReservedSymbols::R14 => Self::A(ACommand::Reserved(ReservedSymbols::R14)),
+            ReservedSymbols::R15 => Self::A(ACommand::Reserved(ReservedSymbols::R15)),
+            ReservedSymbols::SCREEN => Self::A(ACommand::Reserved(ReservedSymbols::SCREEN)),
+            ReservedSymbols::KBD => Self::A(ACommand::Reserved(ReservedSymbols::KBD)),
+        }
+    }
+}
+
+impl std::convert::From<CCommand> for Command {
+    fn from(value: CCommand) -> Self {
+        Self::C(value)
+    }
+}
+
 /// Convenience container for a label that has been read
 #[derive(Debug, PartialEq, Eq)]
 pub struct LabelAddress {
@@ -448,7 +489,7 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     Ok(SecondPass::new(buf, symbol_table))
 }
 
-pub use assembly_io::{CCommand, CComp, CDest, CJump};
+pub use assembly_io::{ACommand, CCommand, CComp, CDest, CJump};
 
 #[cfg(test)]
 mod assembly_tests {
@@ -488,7 +529,7 @@ mod book_tests {
         ";
         let mut machine_code = hack_interface::hack_io::Writer::new(Vec::new());
         for bit16 in crate::assemble_from_bytes(&asm[..])? {
-            machine_code.write_instruction(&bit16?)?;
+            machine_code.write_instruction(bit16?)?;
         }
         assert_eq!(TWO_PLUS_THREE.as_bytes(), machine_code.as_ref());
 
@@ -538,7 +579,7 @@ mod book_tests {
 
         let mut machine_code = hack_interface::hack_io::Writer::new(Vec::new());
         for bit16 in crate::assemble_from_bytes(&asm[..])? {
-            machine_code.write_instruction(&bit16?)?;
+            machine_code.write_instruction(bit16?)?;
         }
         assert_eq!(PICK_MAX.as_bytes(), machine_code.as_ref());
 
@@ -573,7 +614,7 @@ mod book_tests {
         ";
         let mut machine_code = hack_interface::hack_io::Writer::new(Vec::new());
         for bit16 in crate::assemble_from_bytes(&asm[..])? {
-            machine_code.write_instruction(&bit16?)?;
+            machine_code.write_instruction(bit16?)?;
         }
         assert_eq!(PICK_MAX.as_bytes(), machine_code.as_ref());
 

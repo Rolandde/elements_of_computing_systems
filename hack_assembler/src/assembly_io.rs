@@ -531,6 +531,42 @@ impl std::convert::From<CComp> for [bool; 7] {
     }
 }
 
+impl std::fmt::Display for CComp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Zero => "0",
+            Self::One => "1",
+            Self::MinumOne => "-1",
+            Self::D => "D",
+            Self::A => "A",
+            Self::NotD => "!D",
+            Self::NotA => "!A",
+            Self::MinusD => "-D",
+            Self::MinusA => "-A",
+            Self::DPlusOne => "D+1",
+            Self::APlusOne => "A+1",
+            Self::DMinusOne => "D-1",
+            Self::AMinusOne => "A-1",
+            Self::DPlusA => "D+A",
+            Self::DMinusA => "D-A",
+            Self::AMinusD => "A-D",
+            Self::DAndA => "D&A",
+            Self::DOrA => "D|A",
+            Self::M => "M",
+            Self::NotM => "!M",
+            Self::MinusM => "-M",
+            Self::MPlusOne => "M+1",
+            Self::MMinusOne => "M-1",
+            Self::DPlusM => "D+M",
+            Self::DMinusM => "D-M",
+            Self::MMinusD => "M-D",
+            Self::DAndM => "D&M",
+            Self::DOrM => "D|M",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// The destination part of the C command
 #[derive(Debug, PartialEq, Eq)]
 pub enum CDest {
@@ -559,6 +595,22 @@ impl std::str::FromStr for CDest {
             "AMD" => Ok(CDest::AMD),
             _ => Err(()),
         }
+    }
+}
+
+impl std::fmt::Display for CDest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            CDest::Null => "",
+            CDest::M => "M",
+            CDest::D => "D",
+            CDest::MD => "MD",
+            CDest::A => "A",
+            CDest::AM => "AM",
+            CDest::AD => "AD",
+            CDest::AMD => "AMD",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -608,6 +660,22 @@ impl std::str::FromStr for CJump {
     }
 }
 
+impl std::fmt::Display for CJump {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            CJump::Null => "",
+            CJump::Greater => "JGT",
+            CJump::Equal => "JEQ",
+            CJump::GreaterEqual => "JGE",
+            CJump::Less => "JLT",
+            CJump::NotEqual => "JNE",
+            CJump::LessEqual => "JLE",
+            CJump::Jump => "JMP",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl std::convert::From<CJump> for [bool; 3] {
     fn from(value: CJump) -> Self {
         match value {
@@ -633,6 +701,22 @@ pub struct CCommand {
 impl CCommand {
     pub fn new(dest: CDest, comp: CComp, jump: CJump) -> Self {
         CCommand { dest, comp, jump }
+    }
+
+    pub fn new_dest(dest: CDest, comp: CComp) -> Self {
+        CCommand {
+            dest,
+            comp,
+            jump: CJump::Null,
+        }
+    }
+
+    pub fn new_jump(comp: CComp, jump: CJump) -> Self {
+        CCommand {
+            dest: CDest::Null,
+            comp,
+            jump,
+        }
     }
 }
 
@@ -676,6 +760,24 @@ impl std::convert::From<CCommand> for hack_interface::Bit16 {
             true, true, true, comp[0], comp[1], comp[2], comp[3], comp[4], comp[5], comp[6],
             dest[0], dest[1], dest[2], jump[0], jump[1], jump[2],
         ])
+    }
+}
+
+impl std::fmt::Display for CCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dest_sep = match self.dest {
+            CDest::Null => "",
+            _ => "=",
+        };
+        let jump_sep = match self.jump {
+            CJump::Null => "",
+            _ => ";",
+        };
+        write!(
+            f,
+            "{}{dest_sep}{}{jump_sep}{}",
+            self.dest, self.comp, self.jump
+        )
     }
 }
 

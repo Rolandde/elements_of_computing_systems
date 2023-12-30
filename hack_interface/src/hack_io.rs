@@ -93,7 +93,7 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for Instructions<'a, R> {
     }
 }
 
-/// Write [crate::Bit16] as the 0 and 1 representation.
+/// Write [crate::Bit16] as the 0 and 1 representation into any Write type.
 pub struct Writer<W> {
     inner: W,
 }
@@ -108,12 +108,14 @@ impl<W: std::io::Write> Writer<W> {
     /// # Examples
     /// ```
     /// let mut w = hack_interface::hack_io::Writer::new(Vec::new());
-    /// let bit_42 = 42.into();
-    /// w.write_instruction(&bit_42);
+    /// w.write_instruction(42);
     /// assert_eq!(w.as_ref(), &b"0000000000101010\n".to_vec());
     /// ```
-    pub fn write_instruction(&mut self, instruction: &crate::Bit16) -> Result<(), crate::Error> {
-        writeln!(self.inner, "{}", instruction)?;
+    pub fn write_instruction(
+        &mut self,
+        instruction: impl Into<crate::Bit16>,
+    ) -> Result<(), crate::Error> {
+        writeln!(self.inner, "{}", instruction.into())?;
         Ok(())
     }
 }
