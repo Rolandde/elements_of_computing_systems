@@ -292,12 +292,19 @@ impl RomWriter {
         }
     }
 
+    /// Write the next instruction to the ROM
     pub fn write_instruction(&mut self, instruction: impl Into<crate::Bit16>) {
         self.inner.write_next(instruction.into().i)
     }
 
+    /// Take out the ROM from the writer. Destroys the writer.
     pub fn create_rom(self) -> hack_kernel::Rom32K {
         self.inner.create_rom()
+    }
+
+    /// Take out the ROM from the writer, destorying it, and load it into the computer.
+    pub fn create_load_rom(self) -> hack_kernel::Computer {
+        hack_kernel::Computer::new(self.create_rom())
     }
 }
 

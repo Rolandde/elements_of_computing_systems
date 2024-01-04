@@ -10,3 +10,4 @@ name = "hack_virtual_machine"
 
 [dependencies]
 hack_assembler = {path = "../hack_assembler"}
+hack_interface = {path = "../hack_interface"}

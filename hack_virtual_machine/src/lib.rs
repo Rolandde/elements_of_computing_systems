@@ -1,8 +1,6 @@
 use std::convert::Into;
 
-use hack_assembler::{
-    ACommand, CCommand, CComp, CDest, CJump, Command as Assembly, ReservedSymbols,
-};
+use hack_assembler::{CCommand, CComp, CDest, CJump, CleanAssembly as Assembly, ReservedSymbols};
 
 pub struct Translator<R> {
     inner: crate::reader::Reader<R>,
@@ -65,6 +63,7 @@ impl std::str::FromStr for Segment {
     }
 }
 
+/// Virtual machine stack addition.
 pub fn add() -> [Assembly; 9] {
     [
         ReservedSymbols::SP.into(),
@@ -76,6 +75,31 @@ pub fn add() -> [Assembly; 9] {
         CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
         ReservedSymbols::SP.into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Virtual machine stack subtraction.
+pub fn sub() -> [Assembly; 9] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::M, CComp::MMinusD).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Virtual machine stack negation.
+pub fn neg() -> [Assembly; 4] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::M, CComp::MinusM).into(),
     ]
 }
 
@@ -123,3 +147,65 @@ impl std::convert::From<std::io::Error> for Error {
 }
 
 pub mod reader;
+
+#[cfg(test)]
+mod vm_tests {
+    use super::*;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_add() {
+        let mut rom = hack_interface::RomWriter::new();
+        for i in add() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
+        d.write_memory(1.into(), 10.into()); // 10 is the first number to add
+        d.write_memory(2.into(), 100.into()); // 100 is the second number to add
+        let i = i16::try_from(add().len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+        assert_eq!(d.read_memory(1.into()), 110.into());
+        assert_eq!(d.read_memory(0.into()), 2.into());
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut rom = hack_interface::RomWriter::new();
+        for i in sub() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
+        d.write_memory(1.into(), 10.into()); // 10 is the minuend
+        d.write_memory(2.into(), 100.into()); // 100 is the subtrahend
+        let i = i16::try_from(add().len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+        assert_eq!(d.read_memory(1.into()), (-90).into());
+        assert_eq!(d.read_memory(0.into()), 2.into());
+    }
+
+    #[test]
+    fn test_neg() {
+        let mut rom = hack_interface::RomWriter::new();
+        for i in neg() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 2.into()); // Stack pointer is past the number to negate
+        d.write_memory(1.into(), (-10).into());
+        let i = i16::try_from(add().len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+        assert_eq!(d.read_memory(1.into()), 10.into());
+        assert_eq!(d.read_memory(0.into()), 2.into());
+    }
+}

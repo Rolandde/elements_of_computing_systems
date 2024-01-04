@@ -383,44 +383,60 @@ impl std::convert::From<ReservedSymbols> for hack_interface::Bit15 {
     }
 }
 
-pub enum Command {
-    A(ACommand),
+impl std::convert::From<ReservedSymbols> for hack_interface::Bit16 {
+    fn from(value: ReservedSymbols) -> Self {
+        hack_interface::Bit15::from(value).into()
+    }
+}
+
+/// The assembly you get after the second pass, with all symbols removed.
+pub enum CleanAssembly {
+    A(hack_interface::Bit15),
     C(CCommand),
 }
 
-impl std::convert::From<ReservedSymbols> for Command {
+impl std::convert::From<ReservedSymbols> for CleanAssembly {
     fn from(value: ReservedSymbols) -> Self {
         match value {
-            ReservedSymbols::SP => Self::A(ACommand::Reserved(ReservedSymbols::SP)),
-            ReservedSymbols::LCL => Self::A(ACommand::Reserved(ReservedSymbols::LCL)),
-            ReservedSymbols::ARG => Self::A(ACommand::Reserved(ReservedSymbols::ARG)),
-            ReservedSymbols::THIS => Self::A(ACommand::Reserved(ReservedSymbols::THIS)),
-            ReservedSymbols::THAT => Self::A(ACommand::Reserved(ReservedSymbols::THAT)),
-            ReservedSymbols::R0 => Self::A(ACommand::Reserved(ReservedSymbols::R0)),
-            ReservedSymbols::R1 => Self::A(ACommand::Reserved(ReservedSymbols::R1)),
-            ReservedSymbols::R2 => Self::A(ACommand::Reserved(ReservedSymbols::R2)),
-            ReservedSymbols::R3 => Self::A(ACommand::Reserved(ReservedSymbols::R3)),
-            ReservedSymbols::R4 => Self::A(ACommand::Reserved(ReservedSymbols::R4)),
-            ReservedSymbols::R5 => Self::A(ACommand::Reserved(ReservedSymbols::R5)),
-            ReservedSymbols::R6 => Self::A(ACommand::Reserved(ReservedSymbols::R6)),
-            ReservedSymbols::R7 => Self::A(ACommand::Reserved(ReservedSymbols::R7)),
-            ReservedSymbols::R8 => Self::A(ACommand::Reserved(ReservedSymbols::R8)),
-            ReservedSymbols::R9 => Self::A(ACommand::Reserved(ReservedSymbols::R9)),
-            ReservedSymbols::R10 => Self::A(ACommand::Reserved(ReservedSymbols::R10)),
-            ReservedSymbols::R11 => Self::A(ACommand::Reserved(ReservedSymbols::R11)),
-            ReservedSymbols::R12 => Self::A(ACommand::Reserved(ReservedSymbols::R12)),
-            ReservedSymbols::R13 => Self::A(ACommand::Reserved(ReservedSymbols::R13)),
-            ReservedSymbols::R14 => Self::A(ACommand::Reserved(ReservedSymbols::R14)),
-            ReservedSymbols::R15 => Self::A(ACommand::Reserved(ReservedSymbols::R15)),
-            ReservedSymbols::SCREEN => Self::A(ACommand::Reserved(ReservedSymbols::SCREEN)),
-            ReservedSymbols::KBD => Self::A(ACommand::Reserved(ReservedSymbols::KBD)),
+            ReservedSymbols::SP => Self::A(ReservedSymbols::SP.into()),
+            ReservedSymbols::LCL => Self::A(ReservedSymbols::LCL.into()),
+            ReservedSymbols::ARG => Self::A(ReservedSymbols::ARG.into()),
+            ReservedSymbols::THIS => Self::A(ReservedSymbols::THIS.into()),
+            ReservedSymbols::THAT => Self::A(ReservedSymbols::THAT.into()),
+            ReservedSymbols::R0 => Self::A(ReservedSymbols::R0.into()),
+            ReservedSymbols::R1 => Self::A(ReservedSymbols::R1.into()),
+            ReservedSymbols::R2 => Self::A(ReservedSymbols::R2.into()),
+            ReservedSymbols::R3 => Self::A(ReservedSymbols::R3.into()),
+            ReservedSymbols::R4 => Self::A(ReservedSymbols::R4.into()),
+            ReservedSymbols::R5 => Self::A(ReservedSymbols::R5.into()),
+            ReservedSymbols::R6 => Self::A(ReservedSymbols::R6.into()),
+            ReservedSymbols::R7 => Self::A(ReservedSymbols::R7.into()),
+            ReservedSymbols::R8 => Self::A(ReservedSymbols::R8.into()),
+            ReservedSymbols::R9 => Self::A(ReservedSymbols::R9.into()),
+            ReservedSymbols::R10 => Self::A(ReservedSymbols::R10.into()),
+            ReservedSymbols::R11 => Self::A(ReservedSymbols::R11.into()),
+            ReservedSymbols::R12 => Self::A(ReservedSymbols::R12.into()),
+            ReservedSymbols::R13 => Self::A(ReservedSymbols::R13.into()),
+            ReservedSymbols::R14 => Self::A(ReservedSymbols::R14.into()),
+            ReservedSymbols::R15 => Self::A(ReservedSymbols::R15.into()),
+            ReservedSymbols::SCREEN => Self::A(ReservedSymbols::SCREEN.into()),
+            ReservedSymbols::KBD => Self::A(ReservedSymbols::KBD.into()),
         }
     }
 }
 
-impl std::convert::From<CCommand> for Command {
+impl std::convert::From<CCommand> for CleanAssembly {
     fn from(value: CCommand) -> Self {
         Self::C(value)
+    }
+}
+
+impl std::convert::From<CleanAssembly> for hack_interface::Bit16 {
+    fn from(value: CleanAssembly) -> Self {
+        match value {
+            CleanAssembly::A(a) => a.into(),
+            CleanAssembly::C(c) => c.into(),
+        }
     }
 }
 
