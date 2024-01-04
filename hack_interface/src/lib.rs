@@ -268,6 +268,85 @@ impl<'a> std::iter::Iterator for Scan<'a> {
     }
 }
 
+/// Write to a ROM from any type that can be cast into [crate::Bit16].
+///
+/// # Example
+/// ```
+/// use hack_interface::{Bit16, RomWriter};
+/// use hack_kernel::Computer;
+/// use std::str::FromStr;
+/// let mut rw = RomWriter::new();
+/// rw.write_instruction(42);
+/// rw.write_instruction("0110001111001010".parse::<Bit16>().unwrap());
+/// let mut c = Computer::new(rw.create_rom());
+/// c.cycle(false);
+/// ```
+pub struct RomWriter {
+    inner: hack_kernel::Rom32KWriter,
+}
+
+impl RomWriter {
+    pub fn new() -> Self {
+        Self {
+            inner: hack_kernel::Rom32KWriter::new(),
+        }
+    }
+
+    pub fn write_instruction(&mut self, instruction: impl Into<crate::Bit16>) {
+        self.inner.write_next(instruction.into().i)
+    }
+
+    pub fn create_rom(self) -> hack_kernel::Rom32K {
+        self.inner.create_rom()
+    }
+}
+
+/// Create a ROM from a buffer that holds instructions in `.hack` format
+///
+/// # Examples
+/// ```
+/// use hack_interface::write_rom_from_buffer;
+/// use hack_kernel::Computer;
+/// let input = b"0110001111001010\n1111000011110000";
+/// let rom = write_rom_from_buffer(&input[..]);
+/// let mut c = Computer::new(rom);
+/// c.cycle(false);
+/// ```
+/// # Panics
+/// On invalid instruction format. A hack computer cannot run without valid instructions, so there is no point dealing with errors. If one game cartridge won't load, but all your other games work, you either return the game cartridge or have really steady hands.
+///
+pub fn write_rom_from_buffer(buf: impl std::io::BufRead) -> hack_kernel::Rom32K {
+    let mut writer = RomWriter::new();
+    let mut reader = crate::hack_io::Reader::new(buf);
+    for (i, instruction) in reader.instructions().enumerate() {
+        let inst = instruction.unwrap_or_else(|e| panic!("Failed on line {}: {}", i + 1, e));
+        writer.write_instruction(inst);
+    }
+    writer.create_rom()
+}
+
+/// Create a ROM from a `.hack` file
+///
+/// # Examples
+/// ```
+/// use hack_interface::write_rom_from_file;
+/// use hack_kernel::Computer;
+/// // A simple `.hack` file with two lines
+/// let mut d = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+/// d.push("resources/test/example.hack");
+/// let rom = write_rom_from_file(d);
+/// let mut c = Computer::new(rom);
+/// c.cycle(false);
+/// ```
+///
+/// # Panics
+/// See panic note for [write_rom_from_buffer]
+///
+pub fn write_rom_from_file<P: AsRef<std::path::Path>>(path: P) -> hack_kernel::Rom32K {
+    let f = std::fs::File::open(path).unwrap_or_else(|e| panic!("Cannot open file: {}", e));
+    write_rom_from_buffer(std::io::BufReader::new(f))
+}
+
 pub mod hack_io;
 
 #[cfg(test)]
@@ -277,7 +356,7 @@ mod cpu_tests {
     #[test]
     fn count_screen_pixels() {
         let input = b"";
-        let rom = hack_io::write_rom_from_buffer(&input[..]);
+        let rom = write_rom_from_buffer(&input[..]);
         let c = hack_kernel::Computer::new(rom);
         let scan = Scan::new(&c);
         let pixel_count = scan.collect::<Vec<bool>>().len();
@@ -303,7 +382,7 @@ mod book_tests {
     /// The hack machine code was given to test that the computer functions properly.
     #[test]
     pub fn chapter5_add() {
-        let rom = crate::hack_io::write_rom_from_buffer(TWO_PLUS_THREE.as_bytes());
+        let rom = write_rom_from_buffer(TWO_PLUS_THREE.as_bytes());
         let mut computer = hack_kernel::Computer::new(rom);
         for _ in 0..6 {
             computer.cycle(false);
@@ -316,7 +395,7 @@ mod book_tests {
     ///
     /// The hack machine code was given to test that the computer functions properly.
     pub fn chapter5_max(a: Bit16, b: Bit16) -> Bit16 {
-        let rom = crate::hack_io::write_rom_from_buffer(PICK_MAX.as_bytes());
+        let rom = write_rom_from_buffer(PICK_MAX.as_bytes());
         let mut computer = hack_kernel::Computer::new(rom);
         let mut debugger = Debugger::new(&mut computer);
         debugger.write_memory(Bit15::from(0), a);
