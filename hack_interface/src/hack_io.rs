@@ -93,7 +93,9 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for Instructions<'a, R> {
     }
 }
 
-/// Write [crate::Bit16] as the 0 and 1 representation into any Write type.
+/// Write [crate::Bit16] as the 0 and 1 string representation into any Write type.
+///
+/// Useful for writing into a vector for debugging or into a file for strage.
 pub struct Writer<W> {
     inner: W,
 }
@@ -126,6 +128,39 @@ impl<W> std::convert::AsRef<W> for Writer<W> {
     }
 }
 
+/// Write to a ROM from any type that can be cast into [crate::Bit16].
+///
+/// # Example
+/// ```
+/// use hack_interface::hack_io::RomWriter;
+/// use hack_kernel::Computer;
+/// use std::str::FromStr;
+/// let mut rw = RomWriter::new();
+/// rw.write_instruction(42);
+/// rw.write_instruction(hack_interface::Bit16::from_str("0110001111001010").unwrap());
+/// let mut c = Computer::new(rw.create_rom());
+/// c.cycle(false);
+/// ```
+pub struct RomWriter {
+    inner: hack_kernel::Rom32KWriter,
+}
+
+impl RomWriter {
+    pub fn new() -> Self {
+        Self {
+            inner: hack_kernel::Rom32KWriter::new(),
+        }
+    }
+
+    pub fn write_instruction(&mut self, instruction: impl Into<crate::Bit16>) {
+        self.inner.write_next(instruction.into().i)
+    }
+
+    pub fn create_rom(self) -> hack_kernel::Rom32K {
+        self.inner.create_rom()
+    }
+}
+
 /// Create a ROM from a buffer that holds instructions in `.hack` format
 ///
 /// # Examples
@@ -141,11 +176,11 @@ impl<W> std::convert::AsRef<W> for Writer<W> {
 /// On invalid instruction format. A hack computer cannot run without valid instructions, so there is no point dealing with errors. If one game cartridge won't load, but all your other games work, you either return the game cartridge or have really steady hands.
 ///
 pub fn write_rom_from_buffer(buf: impl std::io::BufRead) -> hack_kernel::Rom32K {
-    let mut writer = hack_kernel::Rom32KWriter::new();
+    let mut writer = RomWriter::new();
     let mut reader = Reader::new(buf);
     for (i, instruction) in reader.instructions().enumerate() {
         let inst = instruction.unwrap_or_else(|e| panic!("Failed on line {}: {}", i + 1, e));
-        writer.write_next(inst.i);
+        writer.write_instruction(inst);
     }
     writer.create_rom()
 }

@@ -1,6 +1,8 @@
 //! Tools for interacting with the [hack kernel][hack_kernel].
+//!
+//! [Bit16] is the entrypoint used by all upstream abstractions.
 
-/// A big endian 16 bit abstraction for the hack computer.
+/// A 16 bit abstraction for the hack computer.
 ///
 /// # Examples
 /// ```
@@ -70,7 +72,7 @@ impl std::fmt::Display for Bit16 {
     }
 }
 
-/// A big endian 15 bit abstraction for the hack computer.
+/// A 15 bit abstraction for the hack computer.
 ///
 /// Used for memory address.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]

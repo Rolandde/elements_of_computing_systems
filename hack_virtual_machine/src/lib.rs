@@ -1,3 +1,23 @@
+use std::convert::Into;
+
+use hack_assembler::{
+    ACommand, CCommand, CComp, CDest, CJump, Command as Assembly, ReservedSymbols,
+};
+
+pub struct Translator<R> {
+    inner: crate::reader::Reader<R>,
+    translated: Vec<Assembly>,
+}
+
+impl<R: std::io::BufRead> Translator<R> {
+    pub fn new(buffer: R) -> Self {
+        Self {
+            inner: crate::reader::Reader::new(buffer),
+            translated: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Add,
@@ -43,6 +63,20 @@ impl std::str::FromStr for Segment {
             _ => Err(()),
         }
     }
+}
+
+pub fn add() -> [Assembly; 9] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::M, CComp::DPlusM).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
 }
 
 /// Errors during VM functioning
