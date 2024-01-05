@@ -95,10 +95,7 @@ impl<R: std::io::BufRead> FirstPass<R> {
     /// ```
     pub fn get_label_address(&mut self) -> Result<LabelAddress, hack_interface::Error> {
         let label_line = self.inner.line;
-        let label = self
-            .inner
-            .parse_label()?
-            .ok_or(hack_interface::Error::AssemblyLabel(label_line))?;
+        let label = self.inner.parse_label()?;
         self.read_instruction()?;
 
         match self.inner.is_command() {

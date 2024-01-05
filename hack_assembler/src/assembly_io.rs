@@ -243,12 +243,12 @@ impl<R: std::io::BufRead> Reader<R> {
     /// let rom = b"(Yes)";
     /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// reader.read_line()?;
-    /// assert_eq!(reader.parse_label()?, Some("Yes".to_string()));
+    /// assert_eq!(reader.parse_label()?, "Yes".to_string());
     /// reader.read_line()?;
-    /// assert_eq!(reader.parse_label()?, None);
+    /// assert!(reader.parse_label().is_err());
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn parse_label(&self) -> Result<Option<String>, hack_interface::Error> {
+    pub fn parse_label(&self) -> Result<String, hack_interface::Error> {
         if let Some(a) = &self.buffer {
             let s = a
                 .get(1..a.len() - 1)
@@ -267,10 +267,10 @@ impl<R: std::io::BufRead> Reader<R> {
             } else if crate::ReservedSymbols::is_reserved(s) {
                 Err(hack_interface::Error::AssemblyLabel(self.line))
             } else {
-                Ok(Some(s.to_string()))
+                Ok(s.to_string())
             }
         } else {
-            Ok(None)
+            Err(hack_interface::Error::AssemblyLabel(self.line))
         }
     }
 
@@ -360,6 +360,33 @@ impl<R: std::io::BufRead> Reader<R> {
             Ok(c) => Ok(c),
             Err(()) => Err(hack_interface::Error::CCommand(line)),
         }
+    }
+
+    /// An iterator over assembly instruction. Emply lines and comments are ignored.
+    ///
+    /// # Examples
+    /// ```
+    /// use hack_assembler::assembly_io::{ACommand, CCommand, CDest, CComp, CJump, AssemblyLine};
+    /// let rom = b"(Now)\n@100\nM=D+A;JGE";
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut lines = reader.assembly_lines();
+    /// assert_eq!(
+    ///     lines.next().unwrap().unwrap(),
+    ///     AssemblyLine::Label("Now".to_string())
+    /// );
+    /// assert_eq!(
+    ///     lines.next().unwrap().unwrap(),
+    ///     AssemblyLine::A(ACommand::Address(100))
+    /// );
+    /// assert_eq!(
+    ///     lines.next().unwrap().unwrap(),
+    ///     AssemblyLine::C(CCommand::new(CDest::M, CComp::DPlusA, CJump::GreaterEqual))
+    /// );
+    /// assert!(lines.next().is_none());
+    /// # Ok::<(), hack_interface::Error>(())
+    /// ```
+    pub fn assembly_lines(&mut self) -> AssemblyLines<R> {
+        AssemblyLines { inner: self }
     }
 }
 
@@ -778,6 +805,48 @@ impl std::fmt::Display for CCommand {
             "{}{dest_sep}{}{jump_sep}{}",
             self.dest, self.comp, self.jump
         )
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum AssemblyLine {
+    A(ACommand),
+    C(CCommand),
+    Label(String),
+}
+
+pub struct AssemblyLines<'a, R> {
+    inner: &'a mut Reader<R>,
+}
+
+impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
+    type Item = Result<AssemblyLine, hack_interface::Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let read = match self.inner.read_instruction() {
+            Ok(i) => i,
+            Err(e) => return Some(Err(e)),
+        };
+        if read == 0 {
+            return None;
+        }
+        if self.inner.is_label().unwrap() {
+            match self.inner.parse_label() {
+                Ok(l) => Some(Ok(AssemblyLine::Label(l))),
+                Err(e) => Some(Err(e)),
+            }
+        } else if self.inner.is_a_command().unwrap() {
+            match self.inner.parse_a_command() {
+                Ok(a) => Some(Ok(AssemblyLine::A(a))),
+                Err(e) => Some(Err(e)),
+            }
+        } else if self.inner.is_c_command().unwrap() {
+            match self.inner.parse_c_command() {
+                Ok(c) => Some(Ok(AssemblyLine::C(c))),
+                Err(e) => Some(Err(e)),
+            }
+        } else {
+            Some(Err(hack_interface::Error::Unknown(self.inner.line)))
+        }
     }
 }
 

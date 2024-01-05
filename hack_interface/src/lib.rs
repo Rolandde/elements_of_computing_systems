@@ -140,6 +140,8 @@ pub enum Error {
     Io(std::io::Error),
     /// Duplicated symbol
     SymbolTable(i16),
+    /// The line does not match any expected format
+    Unknown(i16),
 }
 
 impl std::fmt::Display for Error {
@@ -156,6 +158,7 @@ impl std::fmt::Display for Error {
             ),
             Self::Io(e) => write!(f, "cannot read: {}", e),
             Self::SymbolTable(line) => write!(f, "duplicated symbol on line {}", line),
+            Self::Unknown(line) => write!(f, "unknown format on line {}", line),
         }
     }
 }
@@ -170,6 +173,7 @@ impl std::error::Error for Error {
             Self::CharCount(_) => None,
             Self::Io(e) => Some(e),
             Self::SymbolTable(_) => None,
+            Self::Unknown(_) => None,
         }
     }
 }
