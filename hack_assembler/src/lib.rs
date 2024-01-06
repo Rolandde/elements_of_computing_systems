@@ -386,13 +386,15 @@ impl std::convert::From<ReservedSymbols> for hack_interface::Bit16 {
     }
 }
 
-/// The assembly you get after the second pass, with all symbols removed.
-pub enum CleanAssembly {
+/// The assembly everyone needs.
+///
+/// This is the type of this module.
+pub enum Assembly {
     A(hack_interface::Bit15),
     C(CCommand),
 }
 
-impl std::convert::From<ReservedSymbols> for CleanAssembly {
+impl std::convert::From<ReservedSymbols> for Assembly {
     fn from(value: ReservedSymbols) -> Self {
         match value {
             ReservedSymbols::SP => Self::A(ReservedSymbols::SP.into()),
@@ -422,17 +424,17 @@ impl std::convert::From<ReservedSymbols> for CleanAssembly {
     }
 }
 
-impl std::convert::From<CCommand> for CleanAssembly {
+impl std::convert::From<CCommand> for Assembly {
     fn from(value: CCommand) -> Self {
         Self::C(value)
     }
 }
 
-impl std::convert::From<CleanAssembly> for hack_interface::Bit16 {
-    fn from(value: CleanAssembly) -> Self {
+impl std::convert::From<Assembly> for hack_interface::Bit16 {
+    fn from(value: Assembly) -> Self {
         match value {
-            CleanAssembly::A(a) => a.into(),
-            CleanAssembly::C(c) => c.into(),
+            Assembly::A(a) => a.into(),
+            Assembly::C(c) => c.into(),
         }
     }
 }
@@ -502,7 +504,7 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     Ok(SecondPass::new(buf, symbol_table))
 }
 
-pub use assembly_io::{ACommand, CCommand, CComp, CDest, CJump};
+pub use assembly_io::{ACommand, CCommand, CComp, CDest, CJump, Reader};
 
 #[cfg(test)]
 mod assembly_tests {

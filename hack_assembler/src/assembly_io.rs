@@ -187,6 +187,25 @@ impl<R: std::io::BufRead> Reader<R> {
         }
     }
 
+    /// Has anything been read into the buffer?
+    ///
+    /// Will be true before anything has been read or EOF has been reached.
+    ///
+    /// # Examples
+    /// ```
+    /// let rom = b"@100";
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// assert!(reader.is_empty_buffer());
+    /// reader.read_line()?;
+    /// assert!(!reader.is_empty_buffer());
+    /// reader.read_line()?;
+    /// assert!(reader.is_empty_buffer());
+    /// # Ok::<(), hack_interface::Error>(())
+    /// ```
+    pub fn is_empty_buffer(&self) -> bool {
+        return self.buffer.is_none();
+    }
+
     /// Is the current line empty?
     ///
     /// # Examples
@@ -386,7 +405,75 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
     pub fn assembly_lines(&mut self) -> AssemblyLines<R> {
-        AssemblyLines { inner: self }
+        AssemblyLines {
+            inner: self,
+            peeked: false,
+            last_line: 0,
+        }
+    }
+}
+#[derive(Debug, PartialEq, Eq)]
+pub enum AssemblyLine {
+    A(ACommand),
+    C(CCommand),
+    Label(String),
+}
+
+/// An iterator over assembly lines. Create with [Reader::assembly_lines()].
+///
+/// One neat guarantee you get is that a label line will be followed by a command.
+pub struct AssemblyLines<'a, R> {
+    inner: &'a mut Reader<R>,
+    peeked: bool,   // When parsing a label, the iterator peeks ahead to the next line
+    last_line: i16, // The line number of the last line read
+}
+
+impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
+    type Item = Result<AssemblyLine, hack_interface::Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.peeked {
+            match self.inner.read_instruction() {
+                Ok(0) => return None,
+                Ok(i) => self.last_line = i,
+                Err(e) => return Some(Err(e)),
+            }
+        } else {
+            self.peeked = false;
+        }
+        if self.inner.is_label().unwrap() {
+            let label = match self.inner.parse_label() {
+                Ok(s) => s,
+                Err(e) => return Some(Err(e)),
+            };
+            self.peeked = true;
+            match self.inner.read_instruction() {
+                Ok(0) => {
+                    // EOF has been reached. Nowhere to peek to.
+                    self.peeked = false;
+                    return Some(Err(hack_interface::Error::AssemblyLabel(self.last_line)));
+                }
+                Ok(_) => {
+                    if !self.inner.is_command().unwrap() {
+                        return Some(Err(hack_interface::Error::AssemblyLabel(self.last_line)));
+                    } else {
+                        Some(Ok(AssemblyLine::Label(label)))
+                    }
+                }
+                Err(e) => return Some(Err(e)),
+            }
+        } else if self.inner.is_a_command().unwrap() {
+            match self.inner.parse_a_command() {
+                Ok(a) => Some(Ok(AssemblyLine::A(a))),
+                Err(e) => Some(Err(e)),
+            }
+        } else if self.inner.is_c_command().unwrap() {
+            match self.inner.parse_c_command() {
+                Ok(c) => Some(Ok(AssemblyLine::C(c))),
+                Err(e) => Some(Err(e)),
+            }
+        } else {
+            Some(Err(hack_interface::Error::Unknown(self.inner.line)))
+        }
     }
 }
 
@@ -422,6 +509,96 @@ pub enum ACommand {
     Address(i16),
     Reserved(crate::ReservedSymbols),
     Symbol(String),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct CCommand {
+    dest: CDest,
+    comp: CComp,
+    jump: CJump,
+}
+
+impl CCommand {
+    pub fn new(dest: CDest, comp: CComp, jump: CJump) -> Self {
+        CCommand { dest, comp, jump }
+    }
+
+    pub fn new_dest(dest: CDest, comp: CComp) -> Self {
+        CCommand {
+            dest,
+            comp,
+            jump: CJump::Null,
+        }
+    }
+
+    pub fn new_jump(comp: CComp, jump: CJump) -> Self {
+        CCommand {
+            dest: CDest::Null,
+            comp,
+            jump,
+        }
+    }
+}
+
+impl std::str::FromStr for CCommand {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (destination_str, rest) = match s.split_once("=") {
+            Some((d, r)) => (Some(d), r),
+            None => (None, s),
+        };
+
+        let dest = match destination_str {
+            Some(d) => d.parse()?,
+            None => CDest::Null,
+        };
+
+        let (command_str, jump_str) = match rest.split_once(";") {
+            Some((c, j)) => (c, Some(j)),
+            None => (rest, None),
+        };
+
+        let comp = command_str.parse()?;
+
+        let jump = match jump_str {
+            Some(j) => j.parse()?,
+            None => CJump::Null,
+        };
+
+        Ok(CCommand { dest, comp, jump })
+    }
+}
+
+impl std::convert::From<CCommand> for hack_interface::Bit16 {
+    fn from(value: CCommand) -> Self {
+        let dest = <[bool; 3]>::from(value.dest);
+        let comp = <[bool; 7]>::from(value.comp);
+        let jump = <[bool; 3]>::from(value.jump);
+
+        hack_interface::Bit16::from([
+            true, true, true, comp[0], comp[1], comp[2], comp[3], comp[4], comp[5], comp[6],
+            dest[0], dest[1], dest[2], jump[0], jump[1], jump[2],
+        ])
+    }
+}
+
+impl std::fmt::Display for CCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dest_sep = match self.dest {
+            CDest::Null => "",
+            _ => "=",
+        };
+        let jump_sep = match self.jump {
+            CJump::Null => "",
+            _ => ";",
+        };
+        write!(
+            f,
+            "{}{dest_sep}{}{jump_sep}{}",
+            self.dest, self.comp, self.jump
+        )
+    }
 }
 
 /// The comp part of the C instruction
@@ -718,138 +895,6 @@ impl std::convert::From<CJump> for [bool; 3] {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct CCommand {
-    dest: CDest,
-    comp: CComp,
-    jump: CJump,
-}
-
-impl CCommand {
-    pub fn new(dest: CDest, comp: CComp, jump: CJump) -> Self {
-        CCommand { dest, comp, jump }
-    }
-
-    pub fn new_dest(dest: CDest, comp: CComp) -> Self {
-        CCommand {
-            dest,
-            comp,
-            jump: CJump::Null,
-        }
-    }
-
-    pub fn new_jump(comp: CComp, jump: CJump) -> Self {
-        CCommand {
-            dest: CDest::Null,
-            comp,
-            jump,
-        }
-    }
-}
-
-impl std::str::FromStr for CCommand {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (destination_str, rest) = match s.split_once("=") {
-            Some((d, r)) => (Some(d), r),
-            None => (None, s),
-        };
-
-        let dest = match destination_str {
-            Some(d) => d.parse()?,
-            None => CDest::Null,
-        };
-
-        let (command_str, jump_str) = match rest.split_once(";") {
-            Some((c, j)) => (c, Some(j)),
-            None => (rest, None),
-        };
-
-        let comp = command_str.parse()?;
-
-        let jump = match jump_str {
-            Some(j) => j.parse()?,
-            None => CJump::Null,
-        };
-
-        Ok(CCommand { dest, comp, jump })
-    }
-}
-
-impl std::convert::From<CCommand> for hack_interface::Bit16 {
-    fn from(value: CCommand) -> Self {
-        let dest = <[bool; 3]>::from(value.dest);
-        let comp = <[bool; 7]>::from(value.comp);
-        let jump = <[bool; 3]>::from(value.jump);
-
-        hack_interface::Bit16::from([
-            true, true, true, comp[0], comp[1], comp[2], comp[3], comp[4], comp[5], comp[6],
-            dest[0], dest[1], dest[2], jump[0], jump[1], jump[2],
-        ])
-    }
-}
-
-impl std::fmt::Display for CCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let dest_sep = match self.dest {
-            CDest::Null => "",
-            _ => "=",
-        };
-        let jump_sep = match self.jump {
-            CJump::Null => "",
-            _ => ";",
-        };
-        write!(
-            f,
-            "{}{dest_sep}{}{jump_sep}{}",
-            self.dest, self.comp, self.jump
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum AssemblyLine {
-    A(ACommand),
-    C(CCommand),
-    Label(String),
-}
-
-pub struct AssemblyLines<'a, R> {
-    inner: &'a mut Reader<R>,
-}
-
-impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
-    type Item = Result<AssemblyLine, hack_interface::Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let read = match self.inner.read_instruction() {
-            Ok(i) => i,
-            Err(e) => return Some(Err(e)),
-        };
-        if read == 0 {
-            return None;
-        }
-        if self.inner.is_label().unwrap() {
-            match self.inner.parse_label() {
-                Ok(l) => Some(Ok(AssemblyLine::Label(l))),
-                Err(e) => Some(Err(e)),
-            }
-        } else if self.inner.is_a_command().unwrap() {
-            match self.inner.parse_a_command() {
-                Ok(a) => Some(Ok(AssemblyLine::A(a))),
-                Err(e) => Some(Err(e)),
-            }
-        } else if self.inner.is_c_command().unwrap() {
-            match self.inner.parse_c_command() {
-                Ok(c) => Some(Ok(AssemblyLine::C(c))),
-                Err(e) => Some(Err(e)),
-            }
-        } else {
-            Some(Err(hack_interface::Error::Unknown(self.inner.line)))
-        }
-    }
-}
-
 #[cfg(test)]
 mod assembly_io_tests {
     use super::*;
@@ -920,6 +965,29 @@ mod assembly_io_tests {
             }
         );
         assert_eq!(hack_interface::Bit16::from(c), "1111110000000111".parse()?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_assemply_iter() -> Result<(), hack_interface::Error> {
+        let rom = b"(DoubleLabel)\n(GoodLabel)\n@100\nM=D+A;JGE\n(EOLLabel)";
+        let mut reader = Reader::new(&rom[..]);
+        let mut lines = reader.assembly_lines();
+        assert!(lines.next().unwrap().is_err());
+        assert_eq!(
+            lines.next().unwrap().unwrap(),
+            AssemblyLine::Label("GoodLabel".to_string())
+        );
+        assert_eq!(
+            lines.next().unwrap().unwrap(),
+            AssemblyLine::A(ACommand::Address(100))
+        );
+        assert_eq!(
+            lines.next().unwrap().unwrap(),
+            AssemblyLine::C(CCommand::new(CDest::M, CComp::DPlusA, CJump::GreaterEqual))
+        );
+        assert!(lines.next().unwrap().is_err());
+        assert!(lines.next().is_none());
         Ok(())
     }
 }
