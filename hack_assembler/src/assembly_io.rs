@@ -381,17 +381,21 @@ impl<R: std::io::BufRead> Reader<R> {
         }
     }
 
-    /// An iterator over assembly instruction. Emply lines and comments are ignored.
+    /// An iterator over assembly instruction.
     ///
     /// # Examples
     /// ```
     /// use hack_assembler::assembly_io::{ACommand, CCommand, CDest, CComp, CJump, AssemblyLine};
-    /// let rom = b"(Now)\n@100\nM=D+A;JGE";
+    /// let rom = b"(Now)\n//Comment\n@100\nM=D+A;JGE";
     /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
     /// let mut lines = reader.assembly_lines();
     /// assert_eq!(
     ///     lines.next().unwrap().unwrap(),
     ///     AssemblyLine::Label("Now".to_string())
+    /// );
+    /// assert_eq!(
+    ///     lines.next().unwrap().unwrap(),
+    ///     AssemblyLine::Empty
     /// );
     /// assert_eq!(
     ///     lines.next().unwrap().unwrap(),
@@ -405,11 +409,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
     pub fn assembly_lines(&mut self) -> AssemblyLines<R> {
-        AssemblyLines {
-            inner: self,
-            peeked: false,
-            last_line: 0,
-        }
+        AssemblyLines { inner: self }
     }
 
     /// An iterator for the first pass.
@@ -448,47 +448,26 @@ pub enum AssemblyLine {
 }
 
 /// An iterator over assembly lines. Create with [Reader::assembly_lines()].
-///
-/// One neat guarantee you get is that a label line will be followed by a command.
 pub struct AssemblyLines<'a, R> {
     inner: &'a mut Reader<R>,
-    peeked: bool,   // When parsing a label, the iterator peeks ahead to the next line
-    last_line: i16, // The line number of the last line read
 }
 
 impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
     type Item = Result<AssemblyLine, hack_interface::Error>;
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.peeked {
-            match self.inner.read_instruction() {
-                Ok(0) => return None,
-                Ok(i) => self.last_line = i,
-                Err(e) => return Some(Err(e)),
-            }
-        } else {
-            self.peeked = false;
-        }
-        if self.inner.is_label().unwrap() {
+        match self.inner.read_line() {
+            Ok(false) => return None,
+            Ok(true) => {}
+            Err(e) => return Some(Err(e)),
+        };
+        if self.inner.is_empty_line().unwrap() {
+            Some(Ok(AssemblyLine::Empty))
+        } else if self.inner.is_label().unwrap() {
             let label = match self.inner.parse_label() {
                 Ok(s) => s,
                 Err(e) => return Some(Err(e)),
             };
-            self.peeked = true;
-            match self.inner.read_instruction() {
-                Ok(0) => {
-                    // EOF has been reached. Nowhere to peek to.
-                    self.peeked = false;
-                    return Some(Err(hack_interface::Error::AssemblyLabel(self.last_line)));
-                }
-                Ok(_) => {
-                    if !self.inner.is_command().unwrap() {
-                        return Some(Err(hack_interface::Error::AssemblyLabel(self.last_line)));
-                    } else {
-                        Some(Ok(AssemblyLine::Label(label)))
-                    }
-                }
-                Err(e) => return Some(Err(e)),
-            }
+            Some(Ok(AssemblyLine::Label(label)))
         } else if self.inner.is_a_command().unwrap() {
             match self.inner.parse_a_command() {
                 Ok(a) => Some(Ok(AssemblyLine::A(a))),
@@ -1032,29 +1011,6 @@ mod assembly_io_tests {
             }
         );
         assert_eq!(hack_interface::Bit16::from(c), "1111110000000111".parse()?);
-        Ok(())
-    }
-
-    #[test]
-    fn test_assemply_iter() -> Result<(), hack_interface::Error> {
-        let rom = b"(DoubleLabel)\n(GoodLabel)\n@100\nM=D+A;JGE\n(EOLLabel)";
-        let mut reader = Reader::new(&rom[..]);
-        let mut lines = reader.assembly_lines();
-        assert!(lines.next().unwrap().is_err());
-        assert_eq!(
-            lines.next().unwrap().unwrap(),
-            AssemblyLine::Label("GoodLabel".to_string())
-        );
-        assert_eq!(
-            lines.next().unwrap().unwrap(),
-            AssemblyLine::A(ACommand::Address(100))
-        );
-        assert_eq!(
-            lines.next().unwrap().unwrap(),
-            AssemblyLine::C(CCommand::new(CDest::M, CComp::DPlusA, CJump::GreaterEqual))
-        );
-        assert!(lines.next().unwrap().is_err());
-        assert!(lines.next().is_none());
         Ok(())
     }
 }
