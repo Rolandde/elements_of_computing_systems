@@ -411,9 +411,37 @@ impl<R: std::io::BufRead> Reader<R> {
             last_line: 0,
         }
     }
+
+    /// An iterator for the first pass.
+    ///
+    /// # Examples
+    /// ```
+    /// use hack_assembler::assembly_io::FirstPassLine;
+    /// let rom = b"//Comment\n(Now)\n@100";
+    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut first_pass = reader.first_pass();
+    /// assert_eq!(
+    ///     first_pass.next().unwrap().unwrap(),
+    ///     FirstPassLine::Empty
+    /// );
+    /// assert_eq!(
+    ///     first_pass.next().unwrap().unwrap(),
+    ///     FirstPassLine::Label("Now".to_string())
+    /// );
+    /// assert_eq!(
+    ///     first_pass.next().unwrap().unwrap(),
+    ///     FirstPassLine::Command
+    /// );
+    /// assert!(first_pass.next().is_none());
+    /// # Ok::<(), hack_interface::Error>(())
+    /// ```
+    pub fn first_pass(&mut self) -> FirstPass<R> {
+        FirstPass { inner: self }
+    }
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum AssemblyLine {
+    Empty,
     A(ACommand),
     C(CCommand),
     Label(String),
@@ -471,6 +499,45 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
                 Ok(c) => Some(Ok(AssemblyLine::C(c))),
                 Err(e) => Some(Err(e)),
             }
+        } else {
+            Some(Err(hack_interface::Error::Unknown(self.inner.line)))
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum FirstPassLine {
+    Empty,
+    Command,
+    Label(String),
+}
+
+///First pass iterator returning [FirstPassLine].
+///
+/// It returns an item for each line, allowing one to count the input lines from the BufRead.
+pub struct FirstPass<'a, R> {
+    inner: &'a mut Reader<R>,
+}
+
+impl<'a, R: std::io::BufRead> std::iter::Iterator for FirstPass<'a, R> {
+    type Item = Result<FirstPassLine, hack_interface::Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.inner.read_line() {
+            Ok(false) => return None,
+            Ok(true) => {}
+            Err(e) => return Some(Err(e)),
+        };
+
+        if self.inner.is_empty_line().unwrap() {
+            Some(Ok(FirstPassLine::Empty))
+        } else if self.inner.is_label().unwrap() {
+            let label = match self.inner.parse_label() {
+                Ok(s) => s,
+                Err(e) => return Some(Err(e)),
+            };
+            Some(Ok(FirstPassLine::Label(label)))
+        } else if self.inner.is_command().unwrap() {
+            Some(Ok(FirstPassLine::Command))
         } else {
             Some(Err(hack_interface::Error::Unknown(self.inner.line)))
         }
