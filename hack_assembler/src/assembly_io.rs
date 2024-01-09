@@ -283,8 +283,6 @@ impl<R: std::io::BufRead> Reader<R> {
                 .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '$' || c == ':')
             {
                 Err(hack_interface::Error::AssemblyLabel(self.line))
-            } else if crate::ReservedSymbols::is_reserved(s) {
-                Err(hack_interface::Error::AssemblyLabel(self.line))
             } else {
                 Ok(s.to_string())
             }
@@ -435,8 +433,8 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert!(first_pass.next().is_none());
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn first_pass(&mut self) -> FirstPass<R> {
-        FirstPass { inner: self }
+    pub fn first_pass(&mut self) -> FirstPassLines<R> {
+        FirstPassLines { inner: self }
     }
 }
 #[derive(Debug, PartialEq, Eq)]
@@ -484,7 +482,7 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FirstPassLine {
     Empty,
     Command,
@@ -494,11 +492,11 @@ pub enum FirstPassLine {
 ///First pass iterator returning [FirstPassLine].
 ///
 /// It returns an item for each line, allowing one to count the input lines from the BufRead.
-pub struct FirstPass<'a, R> {
+pub struct FirstPassLines<'a, R> {
     inner: &'a mut Reader<R>,
 }
 
-impl<'a, R: std::io::BufRead> std::iter::Iterator for FirstPass<'a, R> {
+impl<'a, R: std::io::BufRead> std::iter::Iterator for FirstPassLines<'a, R> {
     type Item = Result<FirstPassLine, hack_interface::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.read_line() {

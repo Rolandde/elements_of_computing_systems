@@ -6,129 +6,6 @@
 
 pub mod assembly_io;
 
-/// An iterator over the assembly labels and the commands they point to.
-///
-/// Used to create the [SymbolTable] needed for the [SecondPass]
-pub struct FirstPass<R> {
-    inner: crate::assembly_io::Reader<R>,
-    command_count: i16,
-}
-
-impl<R: std::io::BufRead> FirstPass<R> {
-    /// Creates the iterator
-    pub fn new(buffer: R) -> Self {
-        Self {
-            inner: crate::assembly_io::Reader::new(buffer),
-            command_count: 0,
-        }
-    }
-
-    /// Generate the [SymbolTable] directly.
-    ///
-    /// # Examples
-    /// ```
-    /// let rom = b"//Comment\n(Label)\n//Comment\n@1";
-    /// let symbol_table = hack_assembler::FirstPass::new_symbol_table(&rom[..])?;
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn new_symbol_table(buffer: R) -> Result<SymbolTable, hack_interface::Error> {
-        let iter = Self::new(buffer);
-        let mut st = SymbolTable::new();
-
-        for label in iter {
-            let LabelAddress {
-                label,
-                command_count,
-                label_line,
-            } = label?;
-            // Duplicated keys are not allowed
-            if st.inner.contains_key(&label) {
-                Err(hack_interface::Error::SymbolTable(label_line))?
-            }
-            // Commands start at 0
-            st.inner.insert(label, (command_count - 1).into());
-        }
-
-        Ok(st)
-    }
-
-    /// Read the next instruction.
-    ///
-    /// Returns the total number of lines read so far. 0 if EOF has been reached.
-    ///
-    /// # Examples
-    /// ```
-    /// let rom = b"//Nothing\n@Yes\nNo";
-    /// let mut reader = hack_assembler::FirstPass::new(&rom[..]);
-    /// assert_eq!(reader.read_instruction()?, 2);
-    /// assert_eq!(reader.read_instruction()?, 3);
-    /// assert_eq!(reader.read_instruction()?, 0);
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn read_instruction(&mut self) -> Result<i16, hack_interface::Error> {
-        let lines_read = self.inner.read_instruction()?;
-        match self.inner.is_command() {
-            Some(true) => self.command_count += 1,
-            _ => {}
-        }
-        Ok(lines_read)
-    }
-
-    /// Get label and its associated address.
-    ///
-    /// This assumes the reader is at a label.
-    ///
-    /// # Examples
-    /// ```
-    /// let rom = b"//Comment\n(Label)\n//Comment\n@1";
-    /// let mut first_pass = hack_assembler::FirstPass::new(&rom[..]);
-    /// first_pass.read_instruction()?;
-    /// assert_eq!(
-    ///     first_pass.get_label_address()?,
-    ///     hack_assembler::LabelAddress{
-    ///         label: "Label".to_string(),
-    ///         command_count: 1,
-    ///         label_line: 2,
-    ///     }
-    /// );
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn get_label_address(&mut self) -> Result<LabelAddress, hack_interface::Error> {
-        let label_line = self.inner.line;
-        let label = self.inner.parse_label()?;
-        self.read_instruction()?;
-
-        match self.inner.is_command() {
-            Some(true) => Ok(LabelAddress {
-                label,
-                command_count: self.command_count,
-                label_line,
-            }),
-            // Command does not follow a label
-            Some(false) => Err(hack_interface::Error::AssemblyLabel(label_line)),
-            // End of file following label
-            None => Err(hack_interface::Error::AssemblyLabel(label_line)),
-        }
-    }
-}
-
-impl<R: std::io::BufRead> std::iter::Iterator for FirstPass<R> {
-    type Item = Result<LabelAddress, hack_interface::Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.read_instruction() {
-                Ok(_) => {}
-                Err(e) => break Some(Err(e)),
-            }
-            match self.inner.is_label() {
-                None => break None,
-                Some(true) => break Some(self.get_label_address()),
-                Some(false) => continue,
-            }
-        }
-    }
-}
-
 /// An iterator that spits out the binary .hack format.
 ///
 /// [SymbolTable] can be populated by [FirstPass] if labels are in the assembly file.
@@ -234,6 +111,118 @@ impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
     }
 }
 
+pub struct FirstPass {
+    inner: std::collections::HashMap<String, hack_interface::Bit15>,
+    last_label: Option<String>,
+    line_count: i16,
+    command_count: i16,
+}
+
+impl FirstPass {
+    pub fn new() -> Self {
+        Self {
+            inner: std::collections::HashMap::new(),
+            last_label: None,
+            line_count: 0,
+            command_count: 0,
+        }
+    }
+
+    /// Generate the symbol table from the lines read so far.
+    ///
+    /// Gives an error if first pass is at a label. Labels must be followed by commands.
+    ///
+    /// # Examples
+    /// ```
+    /// let s = hack_assembler::FirstPass::new().create()?;
+    /// assert_eq!(s.len(), 0);
+    /// # Ok::<(), hack_interface::Error>(())
+    /// ```
+    pub fn create(self) -> Result<SymbolTable, hack_interface::Error> {
+        match self.last_label {
+            None => Ok(SymbolTable { inner: self.inner }),
+            Some(_) => Err(hack_interface::Error::SymbolTable(self.line_count)),
+        }
+    }
+
+    /// Create a symbol table from a line buffer.
+    ///
+    /// Common use is doing a first pass on a file.
+    ///
+    /// # Examples
+    /// ```
+    /// let b = b"(Label)\n@100";
+    /// let s = hack_assembler::FirstPass::from_buffer(&b[..])?;
+    /// assert_eq!(s.len(), 1);
+    /// # Ok::<(), hack_interface::Error>(())
+    /// ```
+    pub fn from_buffer(
+        buffer: impl std::io::BufRead,
+    ) -> Result<SymbolTable, hack_interface::Error> {
+        let mut fp = Self::new();
+        let mut r = Reader::new(buffer);
+        for l in r.first_pass() {
+            fp.add_line(l?)?;
+        }
+        fp.create()
+    }
+
+    /// Create a symbol table from first pass lines in memory.
+    ///
+    /// # Examples
+    /// ```
+    /// use hack_assembler::FirstPassLine;
+    /// let f = vec![FirstPassLine::Label("Label".to_string()), FirstPassLine::Command];
+    /// let s = hack_assembler::FirstPass::from_slice(&f)?;
+    /// assert_eq!(s.len(), 1);
+    /// # Ok::<(), hack_interface::Error>(())
+    /// ```
+    pub fn from_slice(slice: &[FirstPassLine]) -> Result<SymbolTable, hack_interface::Error> {
+        let mut fp = Self::new();
+        for l in slice {
+            fp.add_line(l.clone())?;
+        }
+        fp.create()
+    }
+
+    pub fn add_line(&mut self, line: FirstPassLine) -> Result<(), hack_interface::Error> {
+        self.line_count += 1;
+        match line {
+            FirstPassLine::Empty => Ok(()),
+            FirstPassLine::Label(s) => match self.last_label {
+                None => {
+                    self.last_label = Some(s);
+                    Ok(())
+                }
+                Some(_) => Err(hack_interface::Error::SymbolTable(self.line_count)),
+            },
+            FirstPassLine::Command => match self.last_label.take() {
+                None => {
+                    self.command_count += 1;
+                    Ok(())
+                }
+                Some(s) => {
+                    self.add_label(s, self.command_count)?;
+                    self.command_count += 1;
+                    self.last_label = None;
+                    Ok(())
+                }
+            },
+        }
+    }
+
+    pub fn add_label(&mut self, label: String, line: i16) -> Result<(), hack_interface::Error> {
+        if ReservedSymbols::is_reserved(&label) {
+            Err(hack_interface::Error::SymbolTable(line))
+        } else if self.inner.contains_key(&label) {
+            Err(hack_interface::Error::SymbolTable(line))
+        } else {
+            self.inner.insert(label, line.into());
+            Ok(())
+        }
+    }
+}
+
 /// Symbol table generated by the first pass through the assembly code.
 ///
 /// Created by [FirstPass]. If you are certain the assembly code does not use any custom symbols, this can be used directly with [SecondPass].
@@ -246,6 +235,10 @@ impl SymbolTable {
         Self {
             inner: std::collections::HashMap::new(),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
     }
 }
 
@@ -473,7 +466,7 @@ pub struct LabelAddress {
 /// # Ok::<(), hack_interface::Error>(())
 /// ```
 pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interface::Error> {
-    let symbol_table = FirstPass::new_symbol_table(from)?;
+    let symbol_table = FirstPass::from_buffer(from)?;
     Ok(SecondPass::new(from, symbol_table))
 }
 
@@ -498,13 +491,13 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
 ) -> Result<SecondPass<std::io::BufReader<std::fs::File>>, hack_interface::Error> {
     let mut f = std::fs::File::open(path.as_ref())?;
     let mut buf = std::io::BufReader::new(f);
-    let symbol_table = FirstPass::new_symbol_table(buf)?;
+    let symbol_table = FirstPass::from_buffer(buf)?;
     f = std::fs::File::open(path)?;
     buf = std::io::BufReader::new(f);
     Ok(SecondPass::new(buf, symbol_table))
 }
 
-pub use assembly_io::{ACommand, CCommand, CComp, CDest, CJump, Reader};
+pub use assembly_io::{ACommand, CCommand, CComp, CDest, CJump, FirstPassLine, Reader};
 
 #[cfg(test)]
 mod assembly_tests {
@@ -513,7 +506,7 @@ mod assembly_tests {
     #[test]
     fn collect_symbol_table() -> Result<(), hack_interface::Error> {
         let rom = b"//Comment\n@0\n(Label)\n//Comment\n@1";
-        let symbol_table = FirstPass::new_symbol_table(&rom[..])?;
+        let symbol_table = FirstPass::from_buffer(&rom[..])?;
         assert_eq!(symbol_table.inner.get("Label"), Some(&1.into()));
         Ok(())
     }
