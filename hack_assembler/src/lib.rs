@@ -6,6 +6,34 @@
 
 pub mod assembly_io;
 
+enum ReadItem<'a> {
+    Unsafe(Box<dyn std::iter::Iterator<Item = Result<AssemblyLine, hack_interface::Error>> + 'a>),
+    Safe(Box<dyn std::iter::Iterator<Item = &'a AssemblyLine> + 'a>),
+}
+
+pub struct SecondPassX<'a> {
+    inner: ReadItem<'a>,
+}
+
+impl<'a> SecondPassX<'a> {
+    pub fn new_from_slice(slice: &'a [AssemblyLine]) -> Self {
+        Self {
+            inner: ReadItem::Safe(Box::new(slice.into_iter())),
+        }
+    }
+
+    ///```
+    /// let b = b"(Yes)\n@100";
+    /// let s = hack_assembler::SecondPassX::new_from_buffer(&b[..]);
+    ///```
+    pub fn new_from_buffer(buffer: impl std::io::BufRead + 'a) -> Self {
+        let r = Reader::new(buffer);
+        Self {
+            inner: ReadItem::Unsafe(Box::new(r.assembly_lines())),
+        }
+    }
+}
+
 /// An iterator that spits out the binary .hack format.
 ///
 /// [SymbolTable] can be populated by [FirstPass] if labels are in the assembly file.
@@ -497,7 +525,9 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     Ok(SecondPass::new(buf, symbol_table))
 }
 
-pub use assembly_io::{ACommand, CCommand, CComp, CDest, CJump, FirstPassLine, Reader};
+pub use assembly_io::{
+    ACommand, AssemblyLine, CCommand, CComp, CDest, CJump, FirstPassLine, Reader,
+};
 
 #[cfg(test)]
 mod assembly_tests {

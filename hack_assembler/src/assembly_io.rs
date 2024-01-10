@@ -406,7 +406,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert!(lines.next().is_none());
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn assembly_lines(&mut self) -> AssemblyLines<R> {
+    pub fn assembly_lines(self) -> AssemblyLines<R> {
         AssemblyLines { inner: self }
     }
 
@@ -446,11 +446,11 @@ pub enum AssemblyLine {
 }
 
 /// An iterator over assembly lines. Create with [Reader::assembly_lines()].
-pub struct AssemblyLines<'a, R> {
-    inner: &'a mut Reader<R>,
+pub struct AssemblyLines<R> {
+    inner: Reader<R>,
 }
 
-impl<'a, R: std::io::BufRead> std::iter::Iterator for AssemblyLines<'a, R> {
+impl<R: std::io::BufRead> std::iter::Iterator for AssemblyLines<R> {
     type Item = Result<AssemblyLine, hack_interface::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.read_line() {
