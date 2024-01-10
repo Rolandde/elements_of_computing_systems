@@ -6,19 +6,19 @@
 
 pub mod assembly_io;
 
-enum ReadItem<'a> {
-    Unsafe(Box<dyn std::iter::Iterator<Item = Result<AssemblyLine, hack_interface::Error>> + 'a>),
-    Safe(Box<dyn std::iter::Iterator<Item = &'a AssemblyLine> + 'a>),
+enum AssemblyIter<'a, R> {
+    Buffer(AssemblyLines<R>),
+    Slice(std::slice::Iter<'a, AssemblyLine>),
 }
 
-pub struct SecondPassX<'a> {
-    inner: ReadItem<'a>,
+pub struct SecondPassX<'a, R> {
+    inner: AssemblyIter<'a, R>,
 }
 
-impl<'a> SecondPassX<'a> {
+impl<'a, R: std::io::BufRead> SecondPassX<'a, R> {
     pub fn new_from_slice(slice: &'a [AssemblyLine]) -> Self {
         Self {
-            inner: ReadItem::Safe(Box::new(slice.into_iter())),
+            inner: AssemblyIter::Slice(slice.into_iter()),
         }
     }
 
@@ -26,10 +26,9 @@ impl<'a> SecondPassX<'a> {
     /// let b = b"(Yes)\n@100";
     /// let s = hack_assembler::SecondPassX::new_from_buffer(&b[..]);
     ///```
-    pub fn new_from_buffer(buffer: impl std::io::BufRead + 'a) -> Self {
-        let r = Reader::new(buffer);
+    pub fn new_from_buffer(buffer: R) -> Self {
         Self {
-            inner: ReadItem::Unsafe(Box::new(r.assembly_lines())),
+            inner: AssemblyIter::Buffer(Reader::new(buffer).assembly_lines()),
         }
     }
 }
@@ -526,7 +525,7 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
 }
 
 pub use assembly_io::{
-    ACommand, AssemblyLine, CCommand, CComp, CDest, CJump, FirstPassLine, Reader,
+    ACommand, AssemblyLine, AssemblyLines, CCommand, CComp, CDest, CJump, FirstPassLine, Reader,
 };
 
 #[cfg(test)]
