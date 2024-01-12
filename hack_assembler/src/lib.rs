@@ -1,395 +1,35 @@
-//! Assembler that converts from `.asm` assembly format to `.hack` machine instructions format.
+//! Assembler that converts `.asm` assembly format to `.hack` machine instructions format.
+//!
+//! [Assembly] is the core of this module. It represents a single line of assembly code.
 //!
 //! You probably want to use [assemble_from_bytes] or [assemble_from_file].
 //!
 //! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
 
-pub mod assembly_io;
-pub use assembly_io::{
-    ACommand, AssemblyLine, AssemblyLines, CCommand, CComp, CDest, CJump, FirstPassLine, Reader,
-};
-use std::{borrow::Cow, convert::TryFrom};
-
-enum AssemblyIter<'a, R> {
-    Buffer(AssemblyLines<R>),
-    Slice(std::slice::Iter<'a, AssemblyLine>),
-}
-
-impl<'a, R: std::io::BufRead> AssemblyIter<'a, R> {
-    fn next(&mut self) -> Option<Result<Cow<AssemblyLine>, hack_interface::Error>> {
-        match self {
-            Self::Buffer(a) => match a.next() {
-                None => None,
-                Some(l) => match l {
-                    Ok(assml) => Some(Ok(Cow::Owned(assml))),
-                    Err(e) => Some(Err(e)),
-                },
-            },
-            Self::Slice(a) => match a.next() {
-                None => None,
-                Some(l) => Some(Ok(Cow::Borrowed(l))),
-            },
-        }
-    }
-}
-
-/// An iterator that spits out the binary .hack format from assembly.
-///
-/// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.
-pub struct SecondPass<'a, R> {
-    inner: AssemblyIter<'a, R>,
-    symbol_table: SymbolTable,
-    variable_symbol_count: i16,
-    line_count: i16,
-}
-
-impl<'a, R: std::io::BufRead> SecondPass<'a, R> {
-    /// Do second pass from parsed assembly in memory.
-    pub fn new_from_slice(slice: &'a [AssemblyLine], symbol_table: SymbolTable) -> Self {
-        Self {
-            inner: AssemblyIter::Slice(slice.into_iter()),
-            symbol_table,
-            variable_symbol_count: 16,
-            line_count: 0,
-        }
-    }
-
-    /// Do a second pass from a buffer.
-    pub fn new_from_buffer(buffer: R, symbol_table: SymbolTable) -> Self {
-        Self {
-            inner: AssemblyIter::Buffer(Reader::new(buffer).assembly_lines()),
-            symbol_table,
-            variable_symbol_count: 16,
-            line_count: 0,
-        }
-    }
-
-    fn assemble_a_command(
-        &mut self,
-        a: ACommand,
-    ) -> Result<hack_interface::Bit16, hack_interface::Error> {
-        match a {
-            ACommand::Address(b) => Ok(b.into()),
-            ACommand::Reserved(r) => Ok(r.into()),
-            ACommand::Symbol(s) => match self.symbol_table.inner.get(&s) {
-                Some(b) => Ok(hack_interface::Bit16::from(*b)),
-                None => {
-                    let current_address = self.variable_symbol_count.into();
-                    self.symbol_table.inner.insert(s, current_address);
-                    self.variable_symbol_count += 1;
-                    Ok(current_address.into())
-                }
-            },
-        }
-    }
-}
-
-impl<'a, R: std::io::BufRead> std::iter::Iterator for SecondPass<'a, R> {
-    type Item = Result<hack_interface::Bit16, hack_interface::Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.line_count += 1;
-        let line = match self.inner.next() {
-            None => return None,
-            Some(res) => match res {
-                Ok(l) => l,
-                Err(e) => return Some(Err(e)),
-            },
-        }
-        .into_owned();
-
-        match line {
-            AssemblyLine::Empty => self.next(),
-            AssemblyLine::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
-            AssemblyLine::C(c_cmd) => Some(Ok(c_cmd.into())),
-            AssemblyLine::Label(_) => self.next(),
-        }
-    }
-}
-
-pub struct FirstPass {
-    inner: std::collections::HashMap<String, hack_interface::Bit15>,
-    last_label: Option<String>,
-    line_count: i16,
-    command_count: i16,
-}
-
-impl FirstPass {
-    pub fn new() -> Self {
-        Self {
-            inner: std::collections::HashMap::new(),
-            last_label: None,
-            line_count: 0,
-            command_count: 0,
-        }
-    }
-
-    /// Generate the symbol table from the lines read so far.
-    ///
-    /// Gives an error if first pass is at a label. Labels must be followed by commands.
-    ///
-    /// # Examples
-    /// ```
-    /// let s = hack_assembler::FirstPass::new().create()?;
-    /// assert_eq!(s.len(), 0);
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn create(self) -> Result<SymbolTable, hack_interface::Error> {
-        match self.last_label {
-            None => Ok(SymbolTable { inner: self.inner }),
-            Some(_) => Err(hack_interface::Error::SymbolTable(self.line_count)),
-        }
-    }
-
-    /// Create a symbol table from a line buffer.
-    ///
-    /// Common use is doing a first pass on a file.
-    ///
-    /// # Examples
-    /// ```
-    /// let b = b"(Label)\n@100";
-    /// let s = hack_assembler::FirstPass::from_buffer(&b[..])?;
-    /// assert_eq!(s.len(), 1);
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn from_buffer(
-        buffer: impl std::io::BufRead,
-    ) -> Result<SymbolTable, hack_interface::Error> {
-        let mut fp = Self::new();
-        let mut r = Reader::new(buffer);
-        for l in r.first_pass() {
-            fp.add_line(l?)?;
-        }
-        fp.create()
-    }
-
-    /// Create a symbol table from first pass lines in memory.
-    ///
-    /// # Examples
-    /// ```
-    /// use hack_assembler::FirstPassLine;
-    /// let f = vec![FirstPassLine::Label("Label".to_string()), FirstPassLine::Command];
-    /// let s = hack_assembler::FirstPass::from_slice(&f)?;
-    /// assert_eq!(s.len(), 1);
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn from_slice(slice: &[FirstPassLine]) -> Result<SymbolTable, hack_interface::Error> {
-        let mut fp = Self::new();
-        for l in slice {
-            fp.add_line(l.clone())?;
-        }
-        fp.create()
-    }
-
-    pub fn add_line(&mut self, line: FirstPassLine) -> Result<(), hack_interface::Error> {
-        self.line_count += 1;
-        match line {
-            FirstPassLine::Empty => Ok(()),
-            FirstPassLine::Label(s) => match self.last_label {
-                None => {
-                    self.last_label = Some(s);
-                    Ok(())
-                }
-                Some(_) => Err(hack_interface::Error::SymbolTable(self.line_count)),
-            },
-            FirstPassLine::Command => match self.last_label.take() {
-                None => {
-                    self.command_count += 1;
-                    Ok(())
-                }
-                Some(s) => {
-                    self.add_label(s, self.command_count)?;
-                    self.command_count += 1;
-                    self.last_label = None;
-                    Ok(())
-                }
-            },
-        }
-    }
-
-    pub fn add_label(&mut self, label: String, line: i16) -> Result<(), hack_interface::Error> {
-        if ReservedSymbols::is_reserved(&label) {
-            Err(hack_interface::Error::SymbolTable(line))
-        } else if self.inner.contains_key(&label) {
-            Err(hack_interface::Error::SymbolTable(line))
-        } else {
-            self.inner.insert(label, line.into());
-            Ok(())
-        }
-    }
-}
-
-/// Symbol table generated by the first pass through the assembly code.
-///
-/// Created by [FirstPass]. If you are certain the assembly code does not use any custom symbols, this can be used directly with [SecondPass].
-pub struct SymbolTable {
-    inner: std::collections::HashMap<String, hack_interface::Bit15>,
-}
-
-impl SymbolTable {
-    pub fn new() -> Self {
-        Self {
-            inner: std::collections::HashMap::new(),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    pub fn get(&self, k: &str) -> Option<hack_interface::Bit15> {
-        match ReservedSymbols::try_from(k) {
-            Ok(b) => Some(b.into()),
-            Err(_) => self.get(k),
-        }
-    }
-}
+pub mod io;
+pub mod parts;
+pub mod pass;
+pub use io::{ACommand, AssemblyLines, CCommand, CComp, CDest, CJump, FirstPassLine, Reader};
+use parts::ReservedSymbols;
+use pass::{FirstPass, SecondPass, SymbolTable};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ReservedSymbols {
-    SP,
-    LCL,
-    ARG,
-    THIS,
-    THAT,
-    R0,
-    R1,
-    R2,
-    R3,
-    R4,
-    R5,
-    R6,
-    R7,
-    R8,
-    R9,
-    R10,
-    R11,
-    R12,
-    R13,
-    R14,
-    R15,
-    SCREEN,
-    KBD,
-}
-
-impl ReservedSymbols {
-    pub fn is_reserved(symbol: &str) -> bool {
-        use std::convert::TryFrom;
-        match Self::try_from(symbol) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
-    }
-}
-
-impl std::convert::TryFrom<&str> for ReservedSymbols {
-    type Error = ();
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "SP" => Ok(ReservedSymbols::SP),
-            "LCL" => Ok(ReservedSymbols::LCL),
-            "ARG" => Ok(ReservedSymbols::ARG),
-            "THIS" => Ok(ReservedSymbols::THIS),
-            "THAT" => Ok(ReservedSymbols::THAT),
-            "R0" => Ok(ReservedSymbols::R0),
-            "R1" => Ok(ReservedSymbols::R1),
-            "R2" => Ok(ReservedSymbols::R2),
-            "R3" => Ok(ReservedSymbols::R3),
-            "R4" => Ok(ReservedSymbols::R4),
-            "R5" => Ok(ReservedSymbols::R5),
-            "R6" => Ok(ReservedSymbols::R6),
-            "R7" => Ok(ReservedSymbols::R7),
-            "R8" => Ok(ReservedSymbols::R8),
-            "R9" => Ok(ReservedSymbols::R9),
-            "R10" => Ok(ReservedSymbols::R10),
-            "R11" => Ok(ReservedSymbols::R11),
-            "R12" => Ok(ReservedSymbols::R12),
-            "R13" => Ok(ReservedSymbols::R13),
-            "R14" => Ok(ReservedSymbols::R14),
-            "R15" => Ok(ReservedSymbols::R15),
-            "SCREEN" => Ok(ReservedSymbols::SCREEN),
-            "KBD" => Ok(ReservedSymbols::KBD),
-            _ => Err(()),
-        }
-    }
-}
-
-impl std::fmt::Display for ReservedSymbols {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            ReservedSymbols::SP => "SP",
-            ReservedSymbols::LCL => "LCL",
-            ReservedSymbols::ARG => "ARG",
-            ReservedSymbols::THIS => "THIS",
-            ReservedSymbols::THAT => "THAT",
-            ReservedSymbols::R0 => "R0",
-            ReservedSymbols::R1 => "R1",
-            ReservedSymbols::R2 => "R2",
-            ReservedSymbols::R3 => "R3",
-            ReservedSymbols::R4 => "R4",
-            ReservedSymbols::R5 => "R5",
-            ReservedSymbols::R6 => "R6",
-            ReservedSymbols::R7 => "R7",
-            ReservedSymbols::R8 => "R8",
-            ReservedSymbols::R9 => "R9",
-            ReservedSymbols::R10 => "R10",
-            ReservedSymbols::R11 => "R11",
-            ReservedSymbols::R12 => "R12",
-            ReservedSymbols::R13 => "R13",
-            ReservedSymbols::R14 => "R14",
-            ReservedSymbols::R15 => "R15",
-            ReservedSymbols::SCREEN => "SCREEN",
-            ReservedSymbols::KBD => "KBD",
-        };
-
-        write!(f, "{}", s)
-    }
-}
-
-impl std::convert::From<ReservedSymbols> for hack_interface::Bit15 {
-    fn from(value: ReservedSymbols) -> Self {
-        match value {
-            ReservedSymbols::SP => 0.into(),
-            ReservedSymbols::LCL => 1.into(),
-            ReservedSymbols::ARG => 2.into(),
-            ReservedSymbols::THIS => 3.into(),
-            ReservedSymbols::THAT => 4.into(),
-            ReservedSymbols::R0 => 0.into(),
-            ReservedSymbols::R1 => 1.into(),
-            ReservedSymbols::R2 => 2.into(),
-            ReservedSymbols::R3 => 3.into(),
-            ReservedSymbols::R4 => 4.into(),
-            ReservedSymbols::R5 => 5.into(),
-            ReservedSymbols::R6 => 6.into(),
-            ReservedSymbols::R7 => 7.into(),
-            ReservedSymbols::R8 => 8.into(),
-            ReservedSymbols::R9 => 9.into(),
-            ReservedSymbols::R10 => 10.into(),
-            ReservedSymbols::R11 => 11.into(),
-            ReservedSymbols::R12 => 12.into(),
-            ReservedSymbols::R13 => 13.into(),
-            ReservedSymbols::R14 => 14.into(),
-            ReservedSymbols::R15 => 15.into(),
-            ReservedSymbols::SCREEN => 16385.into(),
-            ReservedSymbols::KBD => 24576.into(),
-        }
-    }
-}
-
-impl std::convert::From<ReservedSymbols> for hack_interface::Bit16 {
-    fn from(value: ReservedSymbols) -> Self {
-        hack_interface::Bit15::from(value).into()
-    }
+pub enum Assembly {
+    Empty,
+    A(ACommand),
+    C(CCommand),
+    Label(String),
 }
 
 /// The assembly everyone needs.
 ///
 /// This is the type of this module.
-pub enum Assembly {
+pub enum AssemblySimple {
     A(hack_interface::Bit15),
     C(CCommand),
 }
 
-impl std::convert::From<ReservedSymbols> for Assembly {
+impl std::convert::From<ReservedSymbols> for AssemblySimple {
     fn from(value: ReservedSymbols) -> Self {
         match value {
             ReservedSymbols::SP => Self::A(ReservedSymbols::SP.into()),
@@ -419,30 +59,19 @@ impl std::convert::From<ReservedSymbols> for Assembly {
     }
 }
 
-impl std::convert::From<CCommand> for Assembly {
+impl std::convert::From<CCommand> for AssemblySimple {
     fn from(value: CCommand) -> Self {
         Self::C(value)
     }
 }
 
-impl std::convert::From<Assembly> for hack_interface::Bit16 {
-    fn from(value: Assembly) -> Self {
+impl std::convert::From<AssemblySimple> for hack_interface::Bit16 {
+    fn from(value: AssemblySimple) -> Self {
         match value {
-            Assembly::A(a) => a.into(),
-            Assembly::C(c) => c.into(),
+            AssemblySimple::A(a) => a.into(),
+            AssemblySimple::C(c) => c.into(),
         }
     }
-}
-
-/// Convenience container for a label that has been read
-#[derive(Debug, PartialEq, Eq)]
-pub struct LabelAddress {
-    /// The label
-    pub label: String,
-    /// Counting only commands, which command line does the label refer to?
-    pub command_count: i16,
-    /// Total raw lines read to get to the label
-    pub label_line: i16,
 }
 
 /// Two pass assembly from a byte source.
@@ -507,7 +136,7 @@ mod assembly_tests {
     fn collect_symbol_table() -> Result<(), hack_interface::Error> {
         let rom = b"//Comment\n@0\n(Label)\n//Comment\n@1";
         let symbol_table = FirstPass::from_buffer(&rom[..])?;
-        assert_eq!(symbol_table.inner.get("Label"), Some(&1.into()));
+        assert_eq!(symbol_table.get("Label"), Some(1.into()));
         Ok(())
     }
 }
