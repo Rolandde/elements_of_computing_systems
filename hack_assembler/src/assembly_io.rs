@@ -437,7 +437,7 @@ impl<R: std::io::BufRead> Reader<R> {
         FirstPassLines { inner: self }
     }
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AssemblyLine {
     Empty,
     A(ACommand),
@@ -548,14 +548,14 @@ pub fn clean_line(line: &mut String) {
 }
 
 /// A parsed A-command can be either an address, a reserved symbol, or a user defined symbol
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ACommand {
     Address(i16),
     Reserved(crate::ReservedSymbols),
     Symbol(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CCommand {
     dest: CDest,
     comp: CComp,
@@ -646,7 +646,7 @@ impl std::fmt::Display for CCommand {
 }
 
 /// The comp part of the C instruction
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CComp {
     Zero,
     One,
@@ -816,7 +816,7 @@ impl std::fmt::Display for CComp {
 }
 
 /// The destination part of the C command
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CDest {
     Null,
     M,
@@ -878,7 +878,7 @@ impl std::convert::From<CDest> for [bool; 3] {
 }
 
 /// The jump part of the C command
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CJump {
     Null,
     Greater,

@@ -5,104 +5,73 @@
 //! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
 
 pub mod assembly_io;
+pub use assembly_io::{
+    ACommand, AssemblyLine, AssemblyLines, CCommand, CComp, CDest, CJump, FirstPassLine, Reader,
+};
+use std::{borrow::Cow, convert::TryFrom};
 
 enum AssemblyIter<'a, R> {
     Buffer(AssemblyLines<R>),
     Slice(std::slice::Iter<'a, AssemblyLine>),
 }
 
-pub struct SecondPassX<'a, R> {
-    inner: AssemblyIter<'a, R>,
-}
-
-impl<'a, R: std::io::BufRead> SecondPassX<'a, R> {
-    pub fn new_from_slice(slice: &'a [AssemblyLine]) -> Self {
-        Self {
-            inner: AssemblyIter::Slice(slice.into_iter()),
-        }
-    }
-
-    ///```
-    /// let b = b"(Yes)\n@100";
-    /// let s = hack_assembler::SecondPassX::new_from_buffer(&b[..]);
-    ///```
-    pub fn new_from_buffer(buffer: R) -> Self {
-        Self {
-            inner: AssemblyIter::Buffer(Reader::new(buffer).assembly_lines()),
+impl<'a, R: std::io::BufRead> AssemblyIter<'a, R> {
+    fn next(&mut self) -> Option<Result<Cow<AssemblyLine>, hack_interface::Error>> {
+        match self {
+            Self::Buffer(a) => match a.next() {
+                None => None,
+                Some(l) => match l {
+                    Ok(assml) => Some(Ok(Cow::Owned(assml))),
+                    Err(e) => Some(Err(e)),
+                },
+            },
+            Self::Slice(a) => match a.next() {
+                None => None,
+                Some(l) => Some(Ok(Cow::Borrowed(l))),
+            },
         }
     }
 }
 
-/// An iterator that spits out the binary .hack format.
+/// An iterator that spits out the binary .hack format from assembly.
 ///
-/// [SymbolTable] can be populated by [FirstPass] if labels are in the assembly file.
-pub struct SecondPass<R> {
-    inner: crate::assembly_io::Reader<R>,
+/// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.
+pub struct SecondPass<'a, R> {
+    inner: AssemblyIter<'a, R>,
     symbol_table: SymbolTable,
     variable_symbol_count: i16,
+    line_count: i16,
 }
 
-impl<R: std::io::BufRead> SecondPass<R> {
-    pub fn new(buffer: R, symbol_table: SymbolTable) -> Self {
+impl<'a, R: std::io::BufRead> SecondPass<'a, R> {
+    /// Do second pass from parsed assembly in memory.
+    pub fn new_from_slice(slice: &'a [AssemblyLine], symbol_table: SymbolTable) -> Self {
         Self {
-            inner: crate::assembly_io::Reader::new(buffer),
+            inner: AssemblyIter::Slice(slice.into_iter()),
             symbol_table,
             variable_symbol_count: 16,
+            line_count: 0,
         }
     }
 
-    /// Read to the next command, return true if C-command and false if A-command.
-    ///
-    /// # Examples
-    /// ```
-    /// let rom = b"//Comment\n@h\nA;JMP";
-    /// let mut second_pass = hack_assembler::SecondPass::new(
-    ///     &rom[..],
-    ///     hack_assembler::SymbolTable::new(),
-    /// );
-    /// assert_eq!(second_pass.read_command()?, Some(false));
-    /// assert_eq!(second_pass.read_command()?, Some(true));
-    /// assert_eq!(second_pass.read_command()?, None);
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn read_command(&mut self) -> Result<Option<bool>, hack_interface::Error> {
-        self.inner.read_command()?;
-
-        match self.inner.is_c_command() {
-            Some(b) => Ok(Some(b)),
-            None => Ok(None),
+    /// Do a second pass from a buffer.
+    pub fn new_from_buffer(buffer: R, symbol_table: SymbolTable) -> Self {
+        Self {
+            inner: AssemblyIter::Buffer(Reader::new(buffer).assembly_lines()),
+            symbol_table,
+            variable_symbol_count: 16,
+            line_count: 0,
         }
     }
 
-    /// Parses an A-command, resolving symbols if necessary.
-    ///
-    /// Assumes the current line is an A-command.
-    ///
-    /// # Examples
-    /// ```
-    /// let rom = b"@h\n@R6\n@3\n@h\n@h2";
-    /// let mut second_pass = hack_assembler::SecondPass::new(
-    ///     &rom[..],
-    ///     hack_assembler::SymbolTable::new(),
-    /// );
-    /// second_pass.read_command()?;
-    /// assert_eq!(second_pass.parse_a_command()?, 16.into()); // Custom address starts at 16
-    /// second_pass.read_command()?;
-    /// assert_eq!(second_pass.parse_a_command()?, 6.into());  // Predefined constant address
-    /// second_pass.read_command()?;
-    /// assert_eq!(second_pass.parse_a_command()?, 3.into());
-    /// second_pass.read_command()?;
-    /// assert_eq!(second_pass.parse_a_command()?, 16.into());
-    /// second_pass.read_command()?;
-    /// assert_eq!(second_pass.parse_a_command()?, 17.into());
-    /// # Ok::<(), hack_interface::Error>(())
-    ///
-    /// ```
-    pub fn parse_a_command(&mut self) -> Result<hack_interface::Bit16, hack_interface::Error> {
-        match self.inner.parse_a_command()? {
-            crate::assembly_io::ACommand::Address(b) => Ok(b.into()),
-            crate::assembly_io::ACommand::Reserved(r) => Ok(hack_interface::Bit15::from(r).into()),
-            crate::assembly_io::ACommand::Symbol(s) => match self.symbol_table.inner.get(&s) {
+    fn assemble_a_command(
+        &mut self,
+        a: ACommand,
+    ) -> Result<hack_interface::Bit16, hack_interface::Error> {
+        match a {
+            ACommand::Address(b) => Ok(b.into()),
+            ACommand::Reserved(r) => Ok(r.into()),
+            ACommand::Symbol(s) => match self.symbol_table.inner.get(&s) {
                 Some(b) => Ok(hack_interface::Bit16::from(*b)),
                 None => {
                     let current_address = self.variable_symbol_count.into();
@@ -115,25 +84,24 @@ impl<R: std::io::BufRead> SecondPass<R> {
     }
 }
 
-impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
+impl<'a, R: std::io::BufRead> std::iter::Iterator for SecondPass<'a, R> {
     type Item = Result<hack_interface::Bit16, hack_interface::Error>;
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let c_command = match self.read_command() {
-                Ok(Some(c)) => c,
-                Ok(None) => break None,
-                Err(e) => break Some(Err(e)),
-            };
+        self.line_count += 1;
+        let line = match self.inner.next() {
+            None => return None,
+            Some(res) => match res {
+                Ok(l) => l,
+                Err(e) => return Some(Err(e)),
+            },
+        }
+        .into_owned();
 
-            if c_command {
-                break Some(
-                    self.inner
-                        .parse_c_command()
-                        .map(|ok| hack_interface::Bit16::from(ok)),
-                );
-            } else {
-                break Some(self.parse_a_command());
-            }
+        match line {
+            AssemblyLine::Empty => self.next(),
+            AssemblyLine::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
+            AssemblyLine::C(c_cmd) => Some(Ok(c_cmd.into())),
+            AssemblyLine::Label(_) => self.next(),
         }
     }
 }
@@ -267,9 +235,16 @@ impl SymbolTable {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    pub fn get(&self, k: &str) -> Option<hack_interface::Bit15> {
+        match ReservedSymbols::try_from(k) {
+            Ok(b) => Some(b.into()),
+            Err(_) => self.get(k),
+        }
+    }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ReservedSymbols {
     SP,
     LCL,
@@ -494,7 +469,7 @@ pub struct LabelAddress {
 /// ```
 pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interface::Error> {
     let symbol_table = FirstPass::from_buffer(from)?;
-    Ok(SecondPass::new(from, symbol_table))
+    Ok(SecondPass::new_from_buffer(from, symbol_table))
 }
 
 /// Two pass assembly from a `.asm` file.
@@ -515,18 +490,14 @@ pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interf
 /// ```
 pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     path: P,
-) -> Result<SecondPass<std::io::BufReader<std::fs::File>>, hack_interface::Error> {
+) -> Result<SecondPass<'static, std::io::BufReader<std::fs::File>>, hack_interface::Error> {
     let mut f = std::fs::File::open(path.as_ref())?;
     let mut buf = std::io::BufReader::new(f);
     let symbol_table = FirstPass::from_buffer(buf)?;
     f = std::fs::File::open(path)?;
     buf = std::io::BufReader::new(f);
-    Ok(SecondPass::new(buf, symbol_table))
+    Ok(SecondPass::new_from_buffer(buf, symbol_table))
 }
-
-pub use assembly_io::{
-    ACommand, AssemblyLine, AssemblyLines, CCommand, CComp, CDest, CJump, FirstPassLine, Reader,
-};
 
 #[cfg(test)]
 mod assembly_tests {
