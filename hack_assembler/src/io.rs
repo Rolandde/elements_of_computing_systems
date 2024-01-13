@@ -37,7 +37,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"Create\nlife //carefully";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// let (a, b, c, d) = (
     ///     reader.read_line()?,
     ///     reader.read_line()?,
@@ -68,7 +68,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"I\n\nlike\n//me\nyou";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// let (a, b, c, d) = (
     ///     reader.read_instruction()?,
     ///     reader.read_instruction()?,
@@ -99,7 +99,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"//Intro\n@1\n(Label)\nM=D";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// let (a, b, c) = (
     ///     reader.read_command()?,
     ///     reader.read_command()?,
@@ -127,7 +127,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"@Yes\nYes;\nNo";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_command(), Some(true));
     /// reader.read_line()?;
@@ -149,7 +149,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"@Yes\nNo";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_a_command(), Some(true));
     /// reader.read_line()?;
@@ -170,7 +170,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"Yes=\n;Yes\nNo";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_c_command(), Some(true));
     /// reader.read_line()?;
@@ -196,7 +196,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"@100";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// assert!(reader.is_empty_buffer());
     /// reader.read_line()?;
     /// assert!(!reader.is_empty_buffer());
@@ -213,7 +213,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"Create\n//life //carefully";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_empty_line(), Some(false));
     /// reader.read_line()?;
@@ -235,7 +235,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"(Yes\nNo";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.is_label(), Some(true));
     /// reader.read_line()?;
@@ -262,7 +262,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Examples
     /// ```
     /// let rom = b"(Yes)";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(reader.parse_label()?, "Yes".to_string());
     /// reader.read_line()?;
@@ -299,9 +299,9 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::assembly_io::ACommand;
+    /// use hack_assembler::parts::ACommand;
     /// let rom = b"@100\n@Symbol\n@SP";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
@@ -316,7 +316,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_a_command()?,
-    ///     ACommand::Reserved(hack_assembler::ReservedSymbols::SP)
+    ///     ACommand::Reserved(hack_assembler::parts::ReservedSymbols::SP)
     /// );
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
@@ -357,9 +357,9 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::assembly_io::{CCommand, CDest, CComp, CJump};
+    /// use hack_assembler::parts::{CCommand, CDest, CComp, CJump};
     /// let rom = b"M=D+A;JGE";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// reader.read_line()?;
     /// assert_eq!(
     ///     reader.parse_c_command()?,
@@ -385,25 +385,26 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::assembly_io::{ACommand, CCommand, CDest, CComp, CJump, AssemblyLine};
+    /// use hack_assembler::parts::{ACommand, CCommand, CDest, CComp, CJump};
+    /// use hack_assembler::Assembly;
     /// let rom = b"(Now)\n//Comment\n@100\nM=D+A;JGE";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// let mut lines = reader.assembly_lines();
     /// assert_eq!(
     ///     lines.next().unwrap().unwrap(),
-    ///     AssemblyLine::Label("Now".to_string())
+    ///     Assembly::Label("Now".to_string())
     /// );
     /// assert_eq!(
     ///     lines.next().unwrap().unwrap(),
-    ///     AssemblyLine::Empty
+    ///     Assembly::Empty
     /// );
     /// assert_eq!(
     ///     lines.next().unwrap().unwrap(),
-    ///     AssemblyLine::A(ACommand::Address(100))
+    ///     Assembly::A(ACommand::Address(100))
     /// );
     /// assert_eq!(
     ///     lines.next().unwrap().unwrap(),
-    ///     AssemblyLine::C(CCommand::new(CDest::M, CComp::DPlusA, CJump::GreaterEqual))
+    ///     Assembly::C(CCommand::new(CDest::M, CComp::DPlusA, CJump::GreaterEqual))
     /// );
     /// assert!(lines.next().is_none());
     /// # Ok::<(), hack_interface::Error>(())
@@ -416,9 +417,9 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::assembly_io::FirstPassLine;
+    /// use hack_assembler::io::FirstPassLine;
     /// let rom = b"//Comment\n(Now)\n@100";
-    /// let mut reader = hack_assembler::assembly_io::Reader::new(&rom[..]);
+    /// let mut reader = hack_assembler::io::Reader::new(&rom[..]);
     /// let mut first_pass = reader.first_pass();
     /// assert_eq!(
     ///     first_pass.next().unwrap().unwrap(),
@@ -522,7 +523,7 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for FirstPassLines<'a, R> {
 ///
 /// # Examples
 /// ```
-/// use hack_assembler::assembly_io::clean_line;
+/// use hack_assembler::io::clean_line;
 /// let mut s = "in st //spaces and trailing comment".to_string();
 /// clean_line(&mut s);
 /// assert_eq!(s, "inst".to_string());
@@ -572,25 +573,11 @@ mod assembly_io_tests {
         assert_eq!(hack_interface::Bit16::from(c), "1110101010000111".parse()?);
         reader.read_line()?;
         c = reader.parse_c_command()?;
-        assert_eq!(
-            c,
-            CCommand {
-                dest: CDest::Null,
-                comp: CComp::A,
-                jump: CJump::Jump
-            }
-        );
+        assert_eq!(c, CCommand::new_jump(CComp::A, CJump::Jump));
         assert_eq!(hack_interface::Bit16::from(c), "1110110000000111".parse()?);
         reader.read_line()?;
         c = reader.parse_c_command()?;
-        assert_eq!(
-            c,
-            CCommand {
-                dest: CDest::Null,
-                comp: CComp::M,
-                jump: CJump::Jump
-            }
-        );
+        assert_eq!(c, CCommand::new_jump(CComp::M, CJump::Jump));
         assert_eq!(hack_interface::Bit16::from(c), "1111110000000111".parse()?);
         Ok(())
     }

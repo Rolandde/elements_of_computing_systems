@@ -9,9 +9,8 @@
 pub mod io;
 pub mod parts;
 pub mod pass;
-pub use io::{ACommand, AssemblyLines, CCommand, CComp, CDest, CJump, FirstPassLine, Reader};
-use parts::ReservedSymbols;
-use pass::{FirstPass, SecondPass, SymbolTable};
+use parts::{ACommand, CCommand, ReservedSymbols};
+pub use pass::{FirstPass, SecondPass};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Assembly {

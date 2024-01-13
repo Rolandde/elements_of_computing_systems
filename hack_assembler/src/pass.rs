@@ -24,7 +24,7 @@ impl SymbolTable {
         use std::convert::TryFrom;
         match ReservedSymbols::try_from(k) {
             Ok(b) => Some(b.into()),
-            Err(_) => self.get(k),
+            Err(_) => self.inner.get(k).copied(),
         }
     }
 }
@@ -89,7 +89,7 @@ impl FirstPass {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::FirstPassLine;
+    /// use hack_assembler::io::FirstPassLine;
     /// let f = vec![FirstPassLine::Label("Label".to_string()), FirstPassLine::Command];
     /// let s = hack_assembler::FirstPass::from_slice(&f)?;
     /// assert_eq!(s.len(), 1);

@@ -1,6 +1,7 @@
 use std::convert::Into;
 
-use hack_assembler::{AssemblySimple as Assembly, CCommand, CComp, CDest, CJump, ReservedSymbols};
+use hack_assembler::parts::{CCommand, CComp, CDest, ReservedSymbols};
+use hack_assembler::AssemblySimple as Assembly;
 
 pub struct Translator<R> {
     inner: crate::reader::Reader<R>,
