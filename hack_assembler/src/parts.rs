@@ -1,5 +1,8 @@
+//! The structures that make up assembly.
+
 use std::convert::TryFrom;
 
+/// The reserved symbols that point to predefined memory addresses.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ReservedSymbols {
     SP,
@@ -136,14 +139,33 @@ impl std::convert::From<ReservedSymbols> for hack_interface::Bit16 {
     }
 }
 
-/// A parsed A-command can be either an address, a reserved symbol, or a user defined symbol
+/// A parsed A command can be either an address, a reserved symbol, or a user defined symbol.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ACommand {
     Address(i16),
-    Reserved(crate::ReservedSymbols),
+    Reserved(ReservedSymbols),
     Symbol(String),
 }
 
+impl std::convert::From<i16> for ACommand {
+    fn from(value: i16) -> Self {
+        Self::Address(value)
+    }
+}
+
+impl std::convert::From<ReservedSymbols> for ACommand {
+    fn from(value: ReservedSymbols) -> Self {
+        Self::Reserved(value)
+    }
+}
+
+impl std::convert::From<String> for ACommand {
+    fn from(value: String) -> Self {
+        Self::Symbol(value)
+    }
+}
+
+/// A parsed C command, holding a destination, a computation, and a jump part.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CCommand {
     dest: CDest,
@@ -156,6 +178,7 @@ impl CCommand {
         CCommand { dest, comp, jump }
     }
 
+    /// Use if C command doesn't have a jump component (no jump).
     pub fn new_dest(dest: CDest, comp: CComp) -> Self {
         CCommand {
             dest,
@@ -164,6 +187,7 @@ impl CCommand {
         }
     }
 
+    /// Use if C command doesn't have a destination component (no writing to register or memory).
     pub fn new_jump(comp: CComp, jump: CJump) -> Self {
         CCommand {
             dest: CDest::Null,

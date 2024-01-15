@@ -1,60 +1,42 @@
-//! Assembler that converts `.asm` assembly format to `.hack` machine instructions format.
+//! Assembler that converts `.asm` assembly format to `.hack` machine instructions format. You probably want to use [assemble_from_bytes] or [assemble_from_file].
 //!
-//! [Assembly] is the core of this module. It represents a single line of assembly code.
+//! [Assembly] is at the core of parsing. Use the [io::AssemblyLines] iterator created by [io::Reader] to convert asm into nice enums.
 //!
-//! You probably want to use [assemble_from_bytes] or [assemble_from_file].
+//! The process of assembly happens by [FirstPass] creating a [SymbolTable]. [SecondPass] iterator then uses the symbol table to create the [hack_interface::Bit16] `.hack` binary machine instruction.
 //!
-//! As labels can be used before they are defined, a [FirstPass] is necessary to build the symbol table. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
+//! [FirstPass] has to see all assembly lines, because [Assembly::Label] can be used before it is defined. If you know know there are no labels in the `.asm` file, skip the first pass and use [SymbolTable::empty] for the second pass. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
 
 pub mod io;
 pub mod parts;
 pub mod pass;
 use parts::{ACommand, CCommand, ReservedSymbols};
-pub use pass::{FirstPass, SecondPass};
+pub use pass::{FirstPass, SecondPass, SymbolTable};
 
+/// The way to keep an assembly line in memory
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Assembly {
+    /// A line with only whitespace and/or comments
     Empty,
+    /// `A` command setting the `A` register
     A(ACommand),
+    /// `C` command doing a computation and optionally setting registers and/or jumping
     C(CCommand),
+    /// A label recording the position of the next command in the assembly
     Label(String),
 }
 
-/// The assembly everyone needs.
+/// An assembly line without labels or symbols.
 ///
-/// This is the type of this module.
+/// It can be converted to machine code right away. A [ReservedSymbols], a integer address, or a C command all work.
 pub enum AssemblySimple {
-    A(hack_interface::Bit15),
+    AReserved(ReservedSymbols),
+    A(i16),
     C(CCommand),
 }
 
 impl std::convert::From<ReservedSymbols> for AssemblySimple {
     fn from(value: ReservedSymbols) -> Self {
-        match value {
-            ReservedSymbols::SP => Self::A(ReservedSymbols::SP.into()),
-            ReservedSymbols::LCL => Self::A(ReservedSymbols::LCL.into()),
-            ReservedSymbols::ARG => Self::A(ReservedSymbols::ARG.into()),
-            ReservedSymbols::THIS => Self::A(ReservedSymbols::THIS.into()),
-            ReservedSymbols::THAT => Self::A(ReservedSymbols::THAT.into()),
-            ReservedSymbols::R0 => Self::A(ReservedSymbols::R0.into()),
-            ReservedSymbols::R1 => Self::A(ReservedSymbols::R1.into()),
-            ReservedSymbols::R2 => Self::A(ReservedSymbols::R2.into()),
-            ReservedSymbols::R3 => Self::A(ReservedSymbols::R3.into()),
-            ReservedSymbols::R4 => Self::A(ReservedSymbols::R4.into()),
-            ReservedSymbols::R5 => Self::A(ReservedSymbols::R5.into()),
-            ReservedSymbols::R6 => Self::A(ReservedSymbols::R6.into()),
-            ReservedSymbols::R7 => Self::A(ReservedSymbols::R7.into()),
-            ReservedSymbols::R8 => Self::A(ReservedSymbols::R8.into()),
-            ReservedSymbols::R9 => Self::A(ReservedSymbols::R9.into()),
-            ReservedSymbols::R10 => Self::A(ReservedSymbols::R10.into()),
-            ReservedSymbols::R11 => Self::A(ReservedSymbols::R11.into()),
-            ReservedSymbols::R12 => Self::A(ReservedSymbols::R12.into()),
-            ReservedSymbols::R13 => Self::A(ReservedSymbols::R13.into()),
-            ReservedSymbols::R14 => Self::A(ReservedSymbols::R14.into()),
-            ReservedSymbols::R15 => Self::A(ReservedSymbols::R15.into()),
-            ReservedSymbols::SCREEN => Self::A(ReservedSymbols::SCREEN.into()),
-            ReservedSymbols::KBD => Self::A(ReservedSymbols::KBD.into()),
-        }
+        AssemblySimple::AReserved(value)
     }
 }
 
@@ -64,9 +46,16 @@ impl std::convert::From<CCommand> for AssemblySimple {
     }
 }
 
+impl std::convert::From<i16> for AssemblySimple {
+    fn from(value: i16) -> Self {
+        Self::A(value)
+    }
+}
+
 impl std::convert::From<AssemblySimple> for hack_interface::Bit16 {
     fn from(value: AssemblySimple) -> Self {
         match value {
+            AssemblySimple::AReserved(r) => r.into(),
             AssemblySimple::A(a) => a.into(),
             AssemblySimple::C(c) => c.into(),
         }

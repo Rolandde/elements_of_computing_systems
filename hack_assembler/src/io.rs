@@ -3,10 +3,10 @@
 //! # FAQ
 //!
 //! ## Why `i16` for line counting?
-//! The [hack_kernel::Computer] and the [ROM][hack_kernel::Rom32K] use a 15 bit address space. Although an .asm file (which is loaded in the ROM) could contain more lines than can be expressed by 15 bits (greater than 32767), the extra lines would not fit into the ROM. By using `i16` and starting from 0 (first bit is always 0), one gets a very convenient representation of a 15 bit address space. [crate::Bit15] contains a check for negative numbers, so will panic if integer overflow happens.
+//! The [hack_kernel::Computer] and the [ROM][hack_kernel::Rom32K] use a 15 bit address space. Although an .asm file (which is loaded in the ROM) could contain more lines than can be expressed by 15 bits (greater than 32767), the extra lines would not fit into the ROM. By using `i16` and starting from 0 (first bit is always 0), one gets a very convenient representation of a 15 bit address space. [hack_interface::Bit15] contains a check for negative numbers, so will panic if integer overflow happens.
 //!
 //! ## Why so many `Option`s?
-//! `None` represents nothing in the [Reader] buffer. This happens if no lines have been read or if EOF has been reached. It is possible to squint and avoid using `Option`. For example, [Reader::is_empty_line()] could be `false` rather than `None`. The advantage of that squint is that you don't have to deal with `Option` all the time (it is annoying). The disadvantage is that you don't have to deal with EOF explicitly. Even if there was a `is_eof()` function, it would be up to me to remember to check. `Option` forces that check, even if it is only to call `unwrap` (which, for the record, is not done). Explicit is better. The neat thing is that the `Option` design feeds in nicely into the [FirstPass][crate::assembly::FirstPass] and [SecondPass][crate::assembly::SecondPass] iterators.
+//! `None` represents nothing in the [Reader] buffer. This happens if no lines have been read or if EOF has been reached. It is possible to squint and avoid using `Option`. For example, [Reader::is_empty_line()] could be `false` rather than `None`. The advantage of that squint is that you don't have to deal with `Option` all the time (it is annoying). The disadvantage is that you don't have to deal with EOF explicitly. Even if there was a `is_eof()` function, it would be up to me to remember to check. `Option` forces that check, even if it is only to call `unwrap` (which, for the record, is not done). Explicit is better. The neat thing is that the `Option` design feeds in nicely into the [FirstPass][crate::FirstPass] and [SecondPass][crate::SecondPass] iterators.
 
 use crate::parts::{ACommand, CCommand};
 use crate::Assembly;
@@ -14,7 +14,7 @@ use hack_interface;
 
 /// Low level reader of .asm files.
 ///
-/// If you want full control over reading. [crate::assembly::FirstPass] and [crate::assembly::SecondPass] offer simpler abstractions for parsing .asm files.
+/// If you want full control over reading. [crate::FirstPass] and [crate::SecondPass] offer simpler abstractions for parsing .asm files.
 pub struct Reader<R> {
     inner: R,
     buffer: Option<String>,
@@ -483,6 +483,17 @@ pub enum FirstPassLine {
     Empty,
     Command,
     Label(String),
+}
+
+impl std::convert::From<Assembly> for FirstPassLine {
+    fn from(value: Assembly) -> Self {
+        match value {
+            Assembly::Empty => Self::Empty,
+            Assembly::Label(s) => Self::Label(s),
+            Assembly::C(_) => Self::Command,
+            Assembly::A(_) => Self::Command,
+        }
+    }
 }
 
 ///First pass iterator returning [FirstPassLine].
