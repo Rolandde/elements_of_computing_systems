@@ -260,6 +260,22 @@ impl Assembler {
     }
 
     /// Do a second pass from a buffer.
+    ///
+    /// # Examples
+    /// ```
+    /// use hack_assembler::{Assembly, SymbolTable};
+    /// use hack_assembler::parts::ACommand;
+    /// let st = SymbolTable::empty();
+    /// let mut assembler = hack_assembler::pass::Assembler::new(st);
+    /// assert_eq!(
+    ///     assembler.pass_line(Assembly::A(ACommand::Address(42))),
+    ///     Some(42.into())
+    /// );
+    /// assert_eq!(
+    ///     assembler.pass_line(Assembly::Empty),
+    ///     None
+    /// );
+    /// ```
     pub fn pass_line(&mut self, assembly: Assembly) -> Option<hack_interface::Bit16> {
         match assembly {
             Assembly::Empty => None,
