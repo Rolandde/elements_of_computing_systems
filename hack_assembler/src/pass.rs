@@ -1,6 +1,10 @@
 //! Logic for doing first and second pass.
+//!
+//! [FirstPass] creates the [SymbolTable]. The [Assembler] is the core assembly, taking a single [Assembly] line at a time and alongside the symbol table, producing [hack_interface::Bit16] machine instructions.
+//!
+//! The [SecondPass] iterator wraps the assembler, providing all the iterator fun. [SecondPassTrusted] is an iterator that produces machine instructions without errors. Use this if you are certain assembly input contains no errors.
 
-use crate::io::{AssemblyLines, FirstPassLine, Reader};
+use crate::io::{FirstPassLine, Reader};
 use crate::parts::{ACommand, ReservedSymbols};
 use crate::Assembly;
 
@@ -162,77 +166,122 @@ impl FirstPass {
     }
 }
 
-/// An iterator that spits out the binary .hack format from assembly.
-///
-/// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.
-pub struct SecondPass<R> {
-    inner: AssemblyLines<R>,
-    symbol_table: SymbolTable,
-    variable_symbol_count: i16,
-    line_count: i16,
+pub struct SecondPass<I>
+where
+    I: std::iter::Iterator<Item = Result<Assembly, hack_interface::Error>>,
+{
+    iter: I,
+    assembler: Assembler,
 }
 
-impl<R: std::io::BufRead> SecondPass<R> {
-    /// Do a second pass from a buffer.
-    pub fn new_from_buffer(buffer: R, symbol_table: SymbolTable) -> Self {
+impl<I> SecondPass<I>
+where
+    I: std::iter::Iterator<Item = Result<Assembly, hack_interface::Error>>,
+{
+    pub fn new(iter: I, symbol_table: SymbolTable) -> Self {
         Self {
-            inner: Reader::new(buffer).assembly_lines(),
+            iter: iter,
+            assembler: Assembler::new(symbol_table),
+        }
+    }
+}
+
+impl<I> std::iter::Iterator for SecondPass<I>
+where
+    I: std::iter::Iterator<Item = Result<Assembly, hack_interface::Error>>,
+{
+    type Item = Result<hack_interface::Bit16, hack_interface::Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let asml = match self.iter.next() {
+            None => return None,
+            Some(res_a) => match res_a {
+                Ok(a) => a,
+                Err(e) => return Some(Err(e)),
+            },
+        };
+        match self.assembler.pass_line(asml) {
+            Some(b) => Some(Ok(b)),
+            None => self.next(),
+        }
+    }
+}
+
+pub struct SecondPassTrusted<I>
+where
+    I: std::iter::Iterator<Item = Assembly>,
+{
+    iter: I,
+    assembler: Assembler,
+}
+
+impl<I> SecondPassTrusted<I>
+where
+    I: std::iter::Iterator<Item = Assembly>,
+{
+    pub fn new(iter: I, symbol_table: SymbolTable) -> Self {
+        Self {
+            iter,
+            assembler: Assembler::new(symbol_table),
+        }
+    }
+}
+
+impl<I> std::iter::Iterator for SecondPassTrusted<I>
+where
+    I: std::iter::Iterator<Item = Assembly>,
+{
+    type Item = hack_interface::Bit16;
+    fn next(&mut self) -> Option<Self::Item> {
+        let asml = match self.iter.next() {
+            None => return None,
+            Some(a) => a,
+        };
+        match self.assembler.pass_line(asml) {
+            Some(b) => Some(b),
+            None => self.next(),
+        }
+    }
+}
+
+/// Convert one [Assembly] line at a time into machine code.
+///
+/// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.
+pub struct Assembler {
+    symbol_table: SymbolTable,
+    variable_symbol_count: i16,
+}
+
+impl Assembler {
+    pub fn new(symbol_table: SymbolTable) -> Self {
+        Self {
             symbol_table,
             variable_symbol_count: 16,
-            line_count: 0,
         }
     }
 
-    pub fn pass_line(
-        &mut self,
-        assembly: Assembly,
-    ) -> Option<Result<hack_interface::Bit16, hack_interface::Error>> {
-        self.line_count += 1;
+    /// Do a second pass from a buffer.
+    pub fn pass_line(&mut self, assembly: Assembly) -> Option<hack_interface::Bit16> {
         match assembly {
             Assembly::Empty => None,
             Assembly::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
-            Assembly::C(c_cmd) => Some(Ok(c_cmd.into())),
+            Assembly::C(c_cmd) => Some(c_cmd.into()),
             Assembly::Label(_) => None,
         }
     }
 
-    fn assemble_a_command(
-        &mut self,
-        a: ACommand,
-    ) -> Result<hack_interface::Bit16, hack_interface::Error> {
+    fn assemble_a_command(&mut self, a: ACommand) -> hack_interface::Bit16 {
         match a {
-            ACommand::Address(b) => Ok(b.into()),
-            ACommand::Reserved(r) => Ok(r.into()),
+            ACommand::Address(b) => b.into(),
+            ACommand::Reserved(r) => r.into(),
             ACommand::Symbol(s) => match self.symbol_table.inner.get(&s) {
-                Some(b) => Ok(hack_interface::Bit16::from(*b)),
+                Some(b) => hack_interface::Bit16::from(*b),
                 None => {
                     let current_address = self.variable_symbol_count.into();
                     self.symbol_table.inner.insert(s, current_address);
                     self.variable_symbol_count += 1;
-                    Ok(current_address.into())
+                    current_address.into()
                 }
             },
-        }
-    }
-}
-
-impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
-    type Item = Result<hack_interface::Bit16, hack_interface::Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.line_count += 1;
-        let line = match self.inner.next() {
-            None => return None,
-            Some(res) => match res {
-                Ok(l) => l,
-                Err(e) => return Some(Err(e)),
-            },
-        };
-
-        match line {
-            Assembly::Empty => self.next(),
-            Assembly::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
-            Assembly::C(c_cmd) => Some(Ok(c_cmd.into())),
-            Assembly::Label(_) => self.next(),
         }
     }
 }

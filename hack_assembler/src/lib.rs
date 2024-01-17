@@ -64,6 +64,8 @@ impl std::convert::From<AssemblySimple> for hack_interface::Bit16 {
 
 /// Two pass assembly from a byte source.
 ///
+/// Returns [SecondPass] iterator that gives machine instructions.
+///
 /// # Examples
 /// ```
 /// let asm = b"
@@ -84,12 +86,17 @@ impl std::convert::From<AssemblySimple> for hack_interface::Bit16 {
 /// assert_eq!(machine_code[3], "1110101010000111".parse()?);
 /// # Ok::<(), hack_interface::Error>(())
 /// ```
-pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interface::Error> {
+pub fn assemble_from_bytes(
+    from: &[u8],
+) -> Result<SecondPass<io::AssemblyLines<&[u8]>>, hack_interface::Error> {
     let symbol_table = FirstPass::from_buffer(from)?;
-    Ok(SecondPass::new_from_buffer(from, symbol_table))
+    let iter = io::Reader::new(from).assembly_lines();
+    Ok(SecondPass::new(iter, symbol_table))
 }
 
 /// Two pass assembly from a `.asm` file.
+///
+/// Returns a scary looking [SecondPass] iterator that returns machine instructions.
 ///
 /// # Examples
 /// ```
@@ -107,13 +114,15 @@ pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interf
 /// ```
 pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     path: P,
-) -> Result<SecondPass<std::io::BufReader<std::fs::File>>, hack_interface::Error> {
+) -> Result<SecondPass<io::AssemblyLines<std::io::BufReader<std::fs::File>>>, hack_interface::Error>
+{
     let mut f = std::fs::File::open(path.as_ref())?;
     let mut buf = std::io::BufReader::new(f);
     let symbol_table = FirstPass::from_buffer(buf)?;
     f = std::fs::File::open(path)?;
     buf = std::io::BufReader::new(f);
-    Ok(SecondPass::new_from_buffer(buf, symbol_table))
+    let iter = io::Reader::new(buf).assembly_lines();
+    Ok(SecondPass::new(iter, symbol_table))
 }
 
 #[cfg(test)]
@@ -228,7 +237,7 @@ mod book_tests {
             @OUTPUT_D
             0;JMP            // goto output_d
             (OUTPUT_FIRST)
-            @R0             
+            @R0
             D=M              // D = first number
             (OUTPUT_D)
             @R2
