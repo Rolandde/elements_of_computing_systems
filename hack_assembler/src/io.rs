@@ -9,7 +9,6 @@
 //! `None` represents nothing in the [Reader] buffer. This happens if no lines have been read or if EOF has been reached. It is possible to squint and avoid using `Option`. For example, [Reader::is_empty_line()] could be `false` rather than `None`. The advantage of that squint is that you don't have to deal with `Option` all the time (it is annoying). The disadvantage is that you don't have to deal with EOF explicitly. Even if there was a `is_eof()` function, it would be up to me to remember to check. `Option` forces that check, even if it is only to call `unwrap` (which, for the record, is not done). Explicit is better. The neat thing is that the `Option` design feeds in nicely into the [FirstPass][crate::FirstPass] and [SecondPass][crate::SecondPass] iterators.
 
 use crate::parts::{ACommand, CCommand};
-use crate::pass::{FirstPass, SecondPass};
 use crate::Assembly;
 use hack_interface;
 

@@ -165,36 +165,18 @@ impl FirstPass {
 /// An iterator that spits out the binary .hack format from assembly.
 ///
 /// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.
-pub struct SecondPass<'a, R> {
-    inner: AssemblyIter<'a, R>,
+pub struct SecondPass<R> {
+    inner: AssemblyLines<R>,
     symbol_table: SymbolTable,
     variable_symbol_count: i16,
     line_count: i16,
 }
 
-impl<'a, R: std::io::BufRead> SecondPass<'a, R> {
-    /// Do second pass from parsed assembly in memory.
-    ///
-    /// # Examples
-    /// ```
-    /// use hack_assembler::{Assembly, SecondPass, SymbolTable};
-    /// let i = vec![Assembly::A(42.into())];
-    /// let iter = SecondPass::new_from_slice(&i, SymbolTable::empty());
-    /// # Ok::<(), hack_interface::Error>(())
-    /// ```
-    pub fn new_from_slice(slice: &'a [Assembly], symbol_table: SymbolTable) -> Self {
-        Self {
-            inner: AssemblyIter::Slice(slice.into_iter()),
-            symbol_table,
-            variable_symbol_count: 16,
-            line_count: 0,
-        }
-    }
-
+impl<R: std::io::BufRead> SecondPass<R> {
     /// Do a second pass from a buffer.
     pub fn new_from_buffer(buffer: R, symbol_table: SymbolTable) -> Self {
         Self {
-            inner: AssemblyIter::Buffer(Reader::new(buffer).assembly_lines()),
+            inner: Reader::new(buffer).assembly_lines(),
             symbol_table,
             variable_symbol_count: 16,
             line_count: 0,
@@ -234,7 +216,7 @@ impl<'a, R: std::io::BufRead> SecondPass<'a, R> {
     }
 }
 
-impl<'a, R: std::io::BufRead> std::iter::Iterator for SecondPass<'a, R> {
+impl<R: std::io::BufRead> std::iter::Iterator for SecondPass<R> {
     type Item = Result<hack_interface::Bit16, hack_interface::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         self.line_count += 1;
@@ -244,8 +226,7 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for SecondPass<'a, R> {
                 Ok(l) => l,
                 Err(e) => return Some(Err(e)),
             },
-        }
-        .into_owned();
+        };
 
         match line {
             Assembly::Empty => self.next(),
@@ -253,41 +234,5 @@ impl<'a, R: std::io::BufRead> std::iter::Iterator for SecondPass<'a, R> {
             Assembly::C(c_cmd) => Some(Ok(c_cmd.into())),
             Assembly::Label(_) => self.next(),
         }
-    }
-}
-
-/// Iterator that can hold iterators from buffer or from memory
-enum AssemblyIter<'a, R> {
-    Buffer(AssemblyLines<R>),
-    Slice(std::slice::Iter<'a, Assembly>),
-}
-
-impl<'a, R: std::io::BufRead> AssemblyIter<'a, R> {
-    fn next(&mut self) -> Option<Result<std::borrow::Cow<Assembly>, hack_interface::Error>> {
-        match self {
-            Self::Buffer(a) => match a.next() {
-                None => None,
-                Some(l) => match l {
-                    Ok(assml) => Some(Ok(std::borrow::Cow::Owned(assml))),
-                    Err(e) => Some(Err(e)),
-                },
-            },
-            Self::Slice(a) => match a.next() {
-                None => None,
-                Some(l) => Some(Ok(std::borrow::Cow::Borrowed(l))),
-            },
-        }
-    }
-}
-
-#[cfg(test)]
-mod assembly_pass_tests {
-    use super::*;
-    use crate::{Assembly, SecondPass, SymbolTable};
-    #[test]
-    fn test_second_pass() -> Result<(), hack_interface::Error> {
-        let i = vec![Assembly::A(42.into())];
-        let iter: SecondPass<'_, &[u8]> = SecondPass::new_from_slice(&i, SymbolTable::empty());
-        Ok(())
     }
 }

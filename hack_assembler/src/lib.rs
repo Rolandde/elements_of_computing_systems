@@ -107,7 +107,7 @@ pub fn assemble_from_bytes(from: &[u8]) -> Result<SecondPass<&[u8]>, hack_interf
 /// ```
 pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     path: P,
-) -> Result<SecondPass<'static, std::io::BufReader<std::fs::File>>, hack_interface::Error> {
+) -> Result<SecondPass<std::io::BufReader<std::fs::File>>, hack_interface::Error> {
     let mut f = std::fs::File::open(path.as_ref())?;
     let mut buf = std::io::BufReader::new(f);
     let symbol_table = FirstPass::from_buffer(buf)?;
