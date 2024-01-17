@@ -201,6 +201,19 @@ impl<'a, R: std::io::BufRead> SecondPass<'a, R> {
         }
     }
 
+    pub fn pass_line(
+        &mut self,
+        assembly: Assembly,
+    ) -> Option<Result<hack_interface::Bit16, hack_interface::Error>> {
+        self.line_count += 1;
+        match assembly {
+            Assembly::Empty => None,
+            Assembly::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
+            Assembly::C(c_cmd) => Some(Ok(c_cmd.into())),
+            Assembly::Label(_) => None,
+        }
+    }
+
     fn assemble_a_command(
         &mut self,
         a: ACommand,
