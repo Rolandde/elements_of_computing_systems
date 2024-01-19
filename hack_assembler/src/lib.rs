@@ -1,8 +1,8 @@
-//! Assembler that converts `.asm` assembly format to `.hack` machine instructions format. You probably want to use [assemble_from_bytes] or [assemble_from_file].
+//! Converts `.asm` assembly format to `.hack` machine instructions format. You probably want to use [assemble_from_bytes] or [assemble_from_file].
 //!
 //! [Assembly] is at the core of parsing. Use the [io::AssemblyLines] iterator created by [io::Reader] to convert asm into nice enums.
 //!
-//! The process of assembly happens by [FirstPass] creating a [SymbolTable]. [SecondPass] iterator then uses the symbol table to create the [hack_interface::Bit16] `.hack` binary machine instruction.
+//! The [Assembler] is the core process, taking a single [Assembly] line at a time and alongside the symbol table, producing [hack_interface::Bit16] machine instructions. [FirstPass] creates a [SymbolTable]. [SecondPass] is an iterator that wraps [Assembler].
 //!
 //! [FirstPass] has to see all assembly lines, because [Assembly::Label] can be used before it is defined. If you know know there are no labels in the `.asm` file, skip the first pass and use [SymbolTable::empty] for the second pass. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
 
@@ -58,6 +58,65 @@ impl std::convert::From<AssemblySimple> for hack_interface::Bit16 {
             AssemblySimple::AReserved(r) => r.into(),
             AssemblySimple::A(a) => a.into(),
             AssemblySimple::C(c) => c.into(),
+        }
+    }
+}
+
+/// Convert one [Assembly] line at a time into machine code.
+///
+/// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.
+pub struct Assembler {
+    symbol_table: SymbolTable,
+    variable_symbol_count: i16,
+}
+
+impl Assembler {
+    pub fn new(symbol_table: SymbolTable) -> Self {
+        Self {
+            symbol_table,
+            variable_symbol_count: 16,
+        }
+    }
+
+    /// Do a second pass from a buffer.
+    ///
+    /// # Examples
+    /// ```
+    /// use hack_assembler::{Assembly, SymbolTable};
+    /// use hack_assembler::parts::ACommand;
+    /// let st = SymbolTable::empty();
+    /// let mut assembler = hack_assembler::pass::Assembler::new(st);
+    /// assert_eq!(
+    ///     assembler.pass_line(Assembly::A(ACommand::Address(42))),
+    ///     Some(42.into())
+    /// );
+    /// assert_eq!(
+    ///     assembler.pass_line(Assembly::Empty),
+    ///     None
+    /// );
+    /// ```
+    pub fn pass_line(&mut self, assembly: Assembly) -> Option<hack_interface::Bit16> {
+        match assembly {
+            Assembly::Empty => None,
+            Assembly::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
+            Assembly::C(c_cmd) => Some(c_cmd.into()),
+            Assembly::Label(_) => None,
+        }
+    }
+
+    fn assemble_a_command(&mut self, a: ACommand) -> hack_interface::Bit16 {
+        match a {
+            ACommand::Address(b) => b.into(),
+            ACommand::Reserved(r) => r.into(),
+            ACommand::Symbol(s) => match self.symbol_table.get(&s) {
+                Some(b) => hack_interface::Bit16::from(b),
+                None => {
+                    let current_address = self.variable_symbol_count.into();
+                    self.symbol_table.insert(s, current_address);
+                    self.variable_symbol_count += 1;
+                    current_address.into()
+                }
+            },
         }
     }
 }
