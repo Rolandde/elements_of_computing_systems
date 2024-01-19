@@ -9,7 +9,8 @@
 pub mod io;
 pub mod parts;
 pub mod pass;
-use parts::{ACommand, CCommand, ReservedSymbols};
+use parts::{ACommand, CCommand};
+use pass::SecondPassTrusted;
 pub use pass::{FirstPass, SecondPass, SymbolTable};
 
 /// The way to keep an assembly line in memory
@@ -23,43 +24,6 @@ pub enum Assembly {
     C(CCommand),
     /// A label recording the position of the next command in the assembly
     Label(String),
-}
-
-/// An assembly line without labels or symbols.
-///
-/// It can be converted to machine code right away. A [ReservedSymbols], a integer address, or a C command all work.
-pub enum AssemblySimple {
-    AReserved(ReservedSymbols),
-    A(i16),
-    C(CCommand),
-}
-
-impl std::convert::From<ReservedSymbols> for AssemblySimple {
-    fn from(value: ReservedSymbols) -> Self {
-        AssemblySimple::AReserved(value)
-    }
-}
-
-impl std::convert::From<CCommand> for AssemblySimple {
-    fn from(value: CCommand) -> Self {
-        Self::C(value)
-    }
-}
-
-impl std::convert::From<i16> for AssemblySimple {
-    fn from(value: i16) -> Self {
-        Self::A(value)
-    }
-}
-
-impl std::convert::From<AssemblySimple> for hack_interface::Bit16 {
-    fn from(value: AssemblySimple) -> Self {
-        match value {
-            AssemblySimple::AReserved(r) => r.into(),
-            AssemblySimple::A(a) => a.into(),
-            AssemblySimple::C(c) => c.into(),
-        }
-    }
 }
 
 /// Convert one [Assembly] line at a time into machine code.
@@ -87,32 +51,32 @@ impl Assembler {
     /// let st = SymbolTable::empty();
     /// let mut assembler = Assembler::new(st);
     /// assert_eq!(
-    ///     assembler.pass_line(Assembly::A(ACommand::Address(42))),
+    ///     assembler.pass_line(&Assembly::A(ACommand::Address(42))),
     ///     Some(42.into())
     /// );
     /// assert_eq!(
-    ///     assembler.pass_line(Assembly::Empty),
+    ///     assembler.pass_line(&Assembly::Empty),
     ///     None
     /// );
     /// ```
-    pub fn pass_line(&mut self, assembly: Assembly) -> Option<hack_interface::Bit16> {
+    pub fn pass_line(&mut self, assembly: &Assembly) -> Option<hack_interface::Bit16> {
         match assembly {
             Assembly::Empty => None,
             Assembly::A(a_cmd) => Some(self.assemble_a_command(a_cmd)),
-            Assembly::C(c_cmd) => Some(c_cmd.into()),
+            Assembly::C(c_cmd) => Some((*c_cmd).into()),
             Assembly::Label(_) => None,
         }
     }
 
-    fn assemble_a_command(&mut self, a: ACommand) -> hack_interface::Bit16 {
+    fn assemble_a_command(&mut self, a: &ACommand) -> hack_interface::Bit16 {
         match a {
-            ACommand::Address(b) => b.into(),
-            ACommand::Reserved(r) => r.into(),
+            ACommand::Address(b) => (*b).into(),
+            ACommand::Reserved(r) => (*r).into(),
             ACommand::Symbol(s) => match self.symbol_table.get(&s) {
                 Some(b) => hack_interface::Bit16::from(b),
                 None => {
                     let current_address = self.variable_symbol_count.into();
-                    self.symbol_table.insert(s, current_address);
+                    self.symbol_table.insert(s.clone(), current_address);
                     self.variable_symbol_count += 1;
                     current_address.into()
                 }
@@ -182,6 +146,13 @@ pub fn assemble_from_file<P: AsRef<std::path::Path>>(
     buf = std::io::BufReader::new(f);
     let iter = io::Reader::new(buf).assembly_lines();
     Ok(SecondPass::new(iter, symbol_table))
+}
+
+pub fn assemble_from_slice(
+    slice: &[Assembly],
+) -> Result<SecondPassTrusted<std::slice::Iter<Assembly>>, hack_interface::Error> {
+    let s = FirstPass::from_slice(slice)?;
+    Ok(SecondPassTrusted::new(slice.iter(), s))
 }
 
 #[cfg(test)]

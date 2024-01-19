@@ -104,16 +104,17 @@ impl FirstPass {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::io::FirstPassLine;
-    /// let f = vec![FirstPassLine::Label("Label".to_string()), FirstPassLine::Command];
+    /// use hack_assembler::Assembly;
+    /// use hack_assembler::parts::ACommand;
+    /// let f = vec![Assembly::Label("Label".to_string()), Assembly::A(ACommand::Address(42))];
     /// let s = hack_assembler::FirstPass::from_slice(&f)?;
     /// assert_eq!(s.len(), 1);
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn from_slice(slice: &[FirstPassLine]) -> Result<SymbolTable, hack_interface::Error> {
+    pub fn from_slice(slice: &[Assembly]) -> Result<SymbolTable, hack_interface::Error> {
         let mut fp = Self::new();
         for l in slice {
-            fp.pass_line(l.clone())?;
+            fp.pass_line(l.clone().into())?;
         }
         fp.create()
     }
@@ -202,24 +203,24 @@ where
                 Err(e) => return Some(Err(e)),
             },
         };
-        match self.assembler.pass_line(asml) {
+        match self.assembler.pass_line(&asml) {
             Some(b) => Some(Ok(b)),
             None => self.next(),
         }
     }
 }
 
-pub struct SecondPassTrusted<I>
+pub struct SecondPassTrusted<'a, I>
 where
-    I: std::iter::Iterator<Item = Assembly>,
+    I: std::iter::Iterator<Item = &'a Assembly>,
 {
     iter: I,
     assembler: Assembler,
 }
 
-impl<I> SecondPassTrusted<I>
+impl<'a, I> SecondPassTrusted<'a, I>
 where
-    I: std::iter::Iterator<Item = Assembly>,
+    I: std::iter::Iterator<Item = &'a Assembly>,
 {
     pub fn new(iter: I, symbol_table: SymbolTable) -> Self {
         Self {
@@ -229,9 +230,9 @@ where
     }
 }
 
-impl<I> std::iter::Iterator for SecondPassTrusted<I>
+impl<'a, I> std::iter::Iterator for SecondPassTrusted<'a, I>
 where
-    I: std::iter::Iterator<Item = Assembly>,
+    I: std::iter::Iterator<Item = &'a Assembly>,
 {
     type Item = hack_interface::Bit16;
     fn next(&mut self) -> Option<Self::Item> {

@@ -3,7 +3,7 @@
 use std::convert::TryFrom;
 
 /// The reserved symbols that point to predefined memory addresses.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ReservedSymbols {
     SP,
     LCL,
@@ -139,6 +139,12 @@ impl std::convert::From<ReservedSymbols> for hack_interface::Bit16 {
     }
 }
 
+impl std::convert::From<ReservedSymbols> for crate::Assembly {
+    fn from(value: ReservedSymbols) -> Self {
+        crate::Assembly::A(ACommand::Reserved(value))
+    }
+}
+
 /// A parsed A command can be either an address, a reserved symbol, or a user defined symbol.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ACommand {
@@ -166,7 +172,7 @@ impl std::convert::From<String> for ACommand {
 }
 
 /// A parsed C command, holding a destination, a computation, and a jump part.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct CCommand {
     dest: CDest,
     comp: CComp,
@@ -240,6 +246,12 @@ impl std::convert::From<CCommand> for hack_interface::Bit16 {
     }
 }
 
+impl std::convert::From<CCommand> for crate::Assembly {
+    fn from(value: CCommand) -> Self {
+        crate::Assembly::C(value)
+    }
+}
+
 impl std::fmt::Display for CCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let dest_sep = match self.dest {
@@ -259,7 +271,7 @@ impl std::fmt::Display for CCommand {
 }
 
 /// The comp part of the C instruction
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CComp {
     Zero,
     One,
@@ -429,7 +441,7 @@ impl std::fmt::Display for CComp {
 }
 
 /// The destination part of the C command
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CDest {
     Null,
     M,
@@ -491,7 +503,7 @@ impl std::convert::From<CDest> for [bool; 3] {
 }
 
 /// The jump part of the C command
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CJump {
     Null,
     Greater,

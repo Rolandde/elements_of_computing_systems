@@ -1,21 +1,7 @@
 use std::convert::Into;
 
 use hack_assembler::parts::{CCommand, CComp, CDest, ReservedSymbols};
-use hack_assembler::AssemblySimple as Assembly;
-
-pub struct Translator<R> {
-    inner: crate::reader::Reader<R>,
-    translated: Vec<Assembly>,
-}
-
-impl<R: std::io::BufRead> Translator<R> {
-    pub fn new(buffer: R) -> Self {
-        Self {
-            inner: crate::reader::Reader::new(buffer),
-            translated: Vec::new(),
-        }
-    }
-}
+use hack_assembler::Assembly;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -157,7 +143,7 @@ mod vm_tests {
     #[test]
     fn test_add() {
         let mut rom = hack_interface::RomWriter::new();
-        for i in add() {
+        for i in hack_assembler::assemble_from_slice(&add()).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
@@ -176,7 +162,7 @@ mod vm_tests {
     #[test]
     fn test_sub() {
         let mut rom = hack_interface::RomWriter::new();
-        for i in sub() {
+        for i in hack_assembler::assemble_from_slice(&sub()).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
@@ -195,7 +181,7 @@ mod vm_tests {
     #[test]
     fn test_neg() {
         let mut rom = hack_interface::RomWriter::new();
-        for i in neg() {
+        for i in hack_assembler::assemble_from_slice(&neg()).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
