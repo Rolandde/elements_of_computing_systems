@@ -321,7 +321,6 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
     pub fn parse_a_command(&self) -> Result<ACommand, hack_interface::Error> {
-        use std::convert::TryInto;
         let line = self.line;
         let a = self
             .buffer

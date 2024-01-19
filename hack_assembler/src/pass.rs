@@ -31,7 +31,6 @@ impl SymbolTable {
 
     /// Get address of label.
     pub fn get(&self, k: &str) -> Option<hack_interface::Bit15> {
-        use std::convert::TryFrom;
         match ReservedSymbols::try_from(k) {
             Ok(b) => Some(b.into()),
             Err(_) => self.inner.get(k).copied(),
