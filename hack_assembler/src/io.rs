@@ -18,7 +18,7 @@ use hack_interface;
 pub struct Reader<R> {
     inner: R,
     buffer: Option<String>,
-    pub(super) line: i16,
+    pub(super) line: usize,
 }
 
 impl<R: std::io::BufRead> Reader<R> {
@@ -78,7 +78,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert_eq!((a, b, c, d), (1, 3, 5, 0));
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn read_instruction(&mut self) -> Result<i16, hack_interface::Error> {
+    pub fn read_instruction(&mut self) -> Result<usize, hack_interface::Error> {
         loop {
             self.read_line()?;
             match self.is_empty_line() {
@@ -108,7 +108,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert_eq!((a, b, c), (2, 4, 0));
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
-    pub fn read_command(&mut self) -> Result<i16, hack_interface::Error> {
+    pub fn read_command(&mut self) -> Result<usize, hack_interface::Error> {
         loop {
             self.read_line()?;
             match self.is_command() {

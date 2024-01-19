@@ -127,11 +127,11 @@ impl std::fmt::Display for Bit15 {
 #[derive(Debug)]
 pub enum Error {
     /// An A-command is expected to begin with an `@` character and be an address or valid symbol.
-    ACommand(i16),
+    ACommand(usize),
     /// One more characters between `(` and `)` followed by a command
-    AssemblyLabel(i16),
+    AssemblyLabel(usize),
     /// The C-command is dest=comp;jump, with dest and jump being optional
-    CCommand(i16),
+    CCommand(usize),
     /// String input is the wrong length, with expected length specified.
     CharCount(usize),
     /// Character can either be `0` or `1`. Offset of invalid character is also recorded.
@@ -139,9 +139,9 @@ pub enum Error {
     /// Upstream IO error.
     Io(std::io::Error),
     /// Duplicated symbol
-    SymbolTable(i16),
+    SymbolTable(usize),
     /// The line does not match any expected format
-    Unknown(i16),
+    Unknown(usize),
 }
 
 impl std::fmt::Display for Error {

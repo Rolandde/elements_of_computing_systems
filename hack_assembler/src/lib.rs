@@ -82,10 +82,10 @@ impl Assembler {
     ///
     /// # Examples
     /// ```
-    /// use hack_assembler::{Assembly, SymbolTable};
+    /// use hack_assembler::{Assembler, Assembly, SymbolTable};
     /// use hack_assembler::parts::ACommand;
     /// let st = SymbolTable::empty();
-    /// let mut assembler = hack_assembler::pass::Assembler::new(st);
+    /// let mut assembler = Assembler::new(st);
     /// assert_eq!(
     ///     assembler.pass_line(Assembly::A(ACommand::Address(42))),
     ///     Some(42.into())

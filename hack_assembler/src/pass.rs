@@ -1,8 +1,8 @@
 //! Logic for doing first and second pass.
 //!
-//! [FirstPass] creates the [SymbolTable].
+//! [FirstPass] creates the [SymbolTable] if labels are in assembly.
 //!
-//! The [SecondPass] iterator wraps the assembler, providing all the iterator fun. [SecondPassTrusted] is an iterator that produces machine instructions without errors. Use this if you are certain assembly input contains no errors.
+//! The [SecondPass] iterator wraps the [Assembler], providing all the iterator fun. [SecondPassTrusted] is an iterator that produces machine instructions without errors. Use this if you are certain assembly input contains no errors.
 
 use crate::io::{FirstPassLine, Reader};
 use crate::parts::ReservedSymbols;
@@ -47,7 +47,7 @@ impl SymbolTable {
 pub struct FirstPass {
     inner: std::collections::HashMap<String, hack_interface::Bit15>,
     last_label: Option<String>,
-    line_count: i16,
+    line_count: usize,
     command_count: i16,
 }
 
@@ -148,7 +148,7 @@ impl FirstPass {
                     Ok(())
                 }
                 Some(s) => {
-                    self.pass_label(s, self.command_count)?;
+                    self.pass_label(s)?;
                     self.command_count += 1;
                     self.last_label = None;
                     Ok(())
@@ -158,13 +158,13 @@ impl FirstPass {
     }
 
     /// Logic for passing a label.
-    fn pass_label(&mut self, label: String, line: i16) -> Result<(), hack_interface::Error> {
+    fn pass_label(&mut self, label: String) -> Result<(), hack_interface::Error> {
         if ReservedSymbols::is_reserved(&label) {
-            Err(hack_interface::Error::SymbolTable(line))
+            Err(hack_interface::Error::SymbolTable(self.line_count))
         } else if self.inner.contains_key(&label) {
-            Err(hack_interface::Error::SymbolTable(line))
+            Err(hack_interface::Error::SymbolTable(self.line_count))
         } else {
-            self.inner.insert(label, line.into());
+            self.inner.insert(label, self.command_count.into());
             Ok(())
         }
     }
