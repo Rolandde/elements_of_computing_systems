@@ -171,6 +171,12 @@ impl std::convert::From<String> for ACommand {
     }
 }
 
+impl std::convert::From<ACommand> for crate::Assembly {
+    fn from(value: ACommand) -> Self {
+        crate::Assembly::A(value)
+    }
+}
+
 /// A parsed C command, holding a destination, a computation, and a jump part.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct CCommand {

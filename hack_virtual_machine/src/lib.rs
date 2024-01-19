@@ -1,6 +1,6 @@
 use std::convert::Into;
 
-use hack_assembler::parts::{CCommand, CComp, CDest, ReservedSymbols};
+use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
 use hack_assembler::Assembly;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -87,6 +87,38 @@ pub fn neg() -> [Assembly; 4] {
         CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
         CCommand::new_dest(CDest::M, CComp::MinusM).into(),
+    ]
+}
+
+/// Virtual machine equality
+pub fn eq() -> [Assembly; 24] {
+    // For the comments, assume stack pointer at memory 0 points to 3
+    // The two numbers to compare at memory 1(X) and 2(Y)
+    [
+        ReservedSymbols::SP.into(),                    // A = 0 (stack pointer)
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] (3, top of stack)
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(), // A = 2
+        CCommand::new_dest(CDest::D, CComp::M).into(), // D = M[2] (Y)
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(), // A = 1
+        CCommand::new_dest(CDest::M, CComp::MMinusD).into(), // M[1] = X - Y
+        CCommand::new_dest(CDest::D, CComp::A).into(), // D = 1
+        ReservedSymbols::SP.into(),                    // A = 0
+        CCommand::new_dest(CDest::M, CComp::D).into(), // M[0] = 1, stack pointer is at subtraction result
+        CCommand::new_dest(CDest::D, CComp::M).into(), // D = X - Y
+        ACommand::Symbol("EQUAL".to_string()).into(),  // @EQUAL
+        CCommand::new_jump(CComp::D, CJump::Equal).into(), // Jump to EQUAL if D is 0, otherwise not equal
+        ReservedSymbols::SP.into(),                        // A = 0
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] (1, where true/false needs to be written)
+        CCommand::new_dest(CDest::M, CComp::Zero).into(), // M[1] = 0
+        ACommand::Symbol("EQUAL_DONE".to_string()).into(), // Jump to finishing equal assembly
+        CCommand::new_jump(CComp::Zero, CJump::Jump).into(), // Always jump to finishing assembly
+        Assembly::Label("EQUAL".to_string()),          // Code for equality
+        ReservedSymbols::SP.into(),                    // A at stack pointer (second of stack)
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] (1, where true/false needs to be written)
+        CCommand::new_dest(CDest::M, CComp::MinumOne).into(), // Second of stack is -1 (true)
+        Assembly::Label("EQUAL_DONE".to_string()),     // Code for finishing up equality
+        ReservedSymbols::SP.into(),                    // A at stack pointer (second of stack)
+        CCommand::new_dest(CDest::M, CComp::APlusOne).into(), // A at stack pointer, but now top of stack
     ]
 }
 
