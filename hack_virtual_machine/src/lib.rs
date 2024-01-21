@@ -95,30 +95,30 @@ pub fn eq() -> [Assembly; 24] {
     // For the comments, assume stack pointer at memory 0 points to 3
     // The two numbers to compare at memory 1(X) and 2(Y)
     [
-        ReservedSymbols::SP.into(),                    // A = 0 (stack pointer)
-        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] (3, top of stack)
-        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(), // A = 2
-        CCommand::new_dest(CDest::D, CComp::M).into(), // D = M[2] (Y)
+        ReservedSymbols::SP.into(), // A = 0 (stack pointer)
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(), // A = M[0] - 1 = 3 - 1 = 2 (top of stack)
+        CCommand::new_dest(CDest::D, CComp::M).into(),         // D = M[2] = Y
         CCommand::new_dest(CDest::A, CComp::AMinusOne).into(), // A = 1
-        CCommand::new_dest(CDest::M, CComp::MMinusD).into(), // M[1] = X - Y
-        CCommand::new_dest(CDest::D, CComp::A).into(), // D = 1
-        ReservedSymbols::SP.into(),                    // A = 0
+        CCommand::new_dest(CDest::M, CComp::MMinusD).into(),   // M[1] = X - Y
+        CCommand::new_dest(CDest::D, CComp::A).into(),         // D = 1
+        ReservedSymbols::SP.into(),                            // A = 0
         CCommand::new_dest(CDest::M, CComp::D).into(), // M[0] = 1, stack pointer is at subtraction result
-        CCommand::new_dest(CDest::D, CComp::M).into(), // D = X - Y
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] = 1
+        CCommand::new_dest(CDest::D, CComp::M).into(), // D = M[1] = X - Y
         ACommand::Symbol("EQUAL".to_string()).into(),  // @EQUAL
         CCommand::new_jump(CComp::D, CJump::Equal).into(), // Jump to EQUAL if D is 0, otherwise not equal
         ReservedSymbols::SP.into(),                        // A = 0
-        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] (1, where true/false needs to be written)
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] = 1 (address where true/false needs to be written)
         CCommand::new_dest(CDest::M, CComp::Zero).into(), // M[1] = 0
         ACommand::Symbol("EQUAL_DONE".to_string()).into(), // Jump to finishing equal assembly
         CCommand::new_jump(CComp::Zero, CJump::Jump).into(), // Always jump to finishing assembly
-        Assembly::Label("EQUAL".to_string()),          // Code for equality
-        ReservedSymbols::SP.into(),                    // A at stack pointer (second of stack)
-        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] (1, where true/false needs to be written)
-        CCommand::new_dest(CDest::M, CComp::MinumOne).into(), // Second of stack is -1 (true)
+        Assembly::Label("EQUAL".to_string()),          // Start of code for equality
+        ReservedSymbols::SP.into(),                    // A = 0
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] = 1, (address where true/false needs to be written)
+        CCommand::new_dest(CDest::M, CComp::MinumOne).into(), // M[1] = -1 (true, X and Y are equal)
         Assembly::Label("EQUAL_DONE".to_string()),     // Code for finishing up equality
-        ReservedSymbols::SP.into(),                    // A at stack pointer (second of stack)
-        CCommand::new_dest(CDest::M, CComp::APlusOne).into(), // A at stack pointer, but now top of stack
+        ReservedSymbols::SP.into(),                    // A = 0
+        CCommand::new_dest(CDest::M, CComp::MPlusOne).into(), // M[0] = M[0] + 1 = 1 + 1 = 2
     ]
 }
 
@@ -175,7 +175,8 @@ mod vm_tests {
     #[test]
     fn test_add() {
         let mut rom = hack_interface::RomWriter::new();
-        for i in hack_assembler::assemble_from_slice(&add()).unwrap() {
+        let ass = add();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
@@ -183,7 +184,7 @@ mod vm_tests {
         d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
         d.write_memory(1.into(), 10.into()); // 10 is the first number to add
         d.write_memory(2.into(), 100.into()); // 100 is the second number to add
-        let i = i16::try_from(add().len()).unwrap();
+        let i = i16::try_from(ass.len()).unwrap();
         while d.read_cpu_counter() != i.into() {
             d.computer().cycle(false);
         }
@@ -194,7 +195,8 @@ mod vm_tests {
     #[test]
     fn test_sub() {
         let mut rom = hack_interface::RomWriter::new();
-        for i in hack_assembler::assemble_from_slice(&sub()).unwrap() {
+        let ass = sub();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
@@ -202,7 +204,7 @@ mod vm_tests {
         d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
         d.write_memory(1.into(), 10.into()); // 10 is the minuend
         d.write_memory(2.into(), 100.into()); // 100 is the subtrahend
-        let i = i16::try_from(add().len()).unwrap();
+        let i = i16::try_from(ass.len()).unwrap();
         while d.read_cpu_counter() != i.into() {
             d.computer().cycle(false);
         }
@@ -213,18 +215,59 @@ mod vm_tests {
     #[test]
     fn test_neg() {
         let mut rom = hack_interface::RomWriter::new();
-        for i in hack_assembler::assemble_from_slice(&neg()).unwrap() {
+        let ass = neg();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
         let mut d = hack_interface::Debugger::new(&mut c);
         d.write_memory(0.into(), 2.into()); // Stack pointer is past the number to negate
         d.write_memory(1.into(), (-10).into());
-        let i = i16::try_from(add().len()).unwrap();
+        let i = i16::try_from(ass.len()).unwrap();
         while d.read_cpu_counter() != i.into() {
             d.computer().cycle(false);
         }
         assert_eq!(d.read_memory(1.into()), 10.into());
+        assert_eq!(d.read_memory(0.into()), 2.into());
+    }
+
+    #[test]
+    fn test_eq_true() {
+        let mut rom = hack_interface::RomWriter::new();
+        let ass = eq();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
+        d.write_memory(1.into(), 42.into()); // 42 is equal to
+        d.write_memory(2.into(), 42.into()); // 42
+        let i = i16::try_from(ass.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+        assert_eq!(d.read_memory(1.into()), (-1).into());
+        assert_eq!(d.read_memory(0.into()), 2.into());
+    }
+
+    #[test]
+    fn test_eq_false() {
+        let mut rom = hack_interface::RomWriter::new();
+        let ass = eq();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
+        d.write_memory(1.into(), (-10).into()); // Not equal to
+        d.write_memory(2.into(), 42.into()); // 42
+        let i = i16::try_from(ass.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+        assert_eq!(d.read_memory(1.into()), 0.into());
         assert_eq!(d.read_memory(0.into()), 2.into());
     }
 }
