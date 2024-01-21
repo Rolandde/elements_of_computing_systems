@@ -90,7 +90,7 @@ pub fn neg() -> [Assembly; 4] {
     ]
 }
 
-/// Virtual machine equality
+/// Virtual machine stack equality
 pub fn eq() -> [Assembly; 24] {
     // For the comments, assume stack pointer at memory 0 points to 3
     // The two numbers to compare at memory 1(X) and 2(Y)
@@ -172,102 +172,114 @@ mod vm_tests {
     use super::*;
     use std::convert::TryFrom;
 
-    #[test]
-    fn test_add() {
+    // Memory address and the expected value. Converted into a assert_eq!.
+    struct MemVal(i16, i16);
+
+    // Stack testing follows the same receipe
+    fn stack_test(
+        ass: &[Assembly],          // The assembly to test
+        stack_pointer: i16,        // Where is the stack pointer
+        top_value: i16,            // What value is at the top of the stack
+        bottom_value: Option<i16>, // What's the next value in the stack. Empty for unary operations
+        assert: Vec<MemVal>,       // Expected values and their memory addresses
+    ) {
         let mut rom = hack_interface::RomWriter::new();
-        let ass = add();
         for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
             rom.write_instruction(i);
         }
         let mut c = rom.create_load_rom();
         let mut d = hack_interface::Debugger::new(&mut c);
-        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
-        d.write_memory(1.into(), 10.into()); // 10 is the first number to add
-        d.write_memory(2.into(), 100.into()); // 100 is the second number to add
+        d.write_memory(0.into(), stack_pointer.into());
+        let mut stack = stack_pointer - 1;
+        d.write_memory(stack.into(), top_value.into());
+        stack -= 1;
+        match bottom_value {
+            Some(b) => d.write_memory(stack.into(), b.into()),
+            None => {}
+        };
         let i = i16::try_from(ass.len()).unwrap();
         while d.read_cpu_counter() != i.into() {
             d.computer().cycle(false);
         }
-        assert_eq!(d.read_memory(1.into()), 110.into());
-        assert_eq!(d.read_memory(0.into()), 2.into());
+
+        for asrt in assert {
+            assert_eq!(d.read_memory(asrt.0.into()), asrt.1.into())
+        }
+    }
+
+    #[test]
+    fn test_add() {
+        stack_test(
+            &add(),
+            456,
+            100,
+            Some(10),
+            vec![MemVal(454, 110), MemVal(0, 455)],
+        )
+    }
+
+    #[test]
+    fn test_add_neg() {
+        stack_test(
+            &add(),
+            260,
+            -100,
+            Some(10),
+            vec![MemVal(258, -90), MemVal(0, 259)],
+        )
     }
 
     #[test]
     fn test_sub() {
-        let mut rom = hack_interface::RomWriter::new();
-        let ass = sub();
-        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
-            rom.write_instruction(i);
-        }
-        let mut c = rom.create_load_rom();
-        let mut d = hack_interface::Debugger::new(&mut c);
-        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
-        d.write_memory(1.into(), 10.into()); // 10 is the minuend
-        d.write_memory(2.into(), 100.into()); // 100 is the subtrahend
-        let i = i16::try_from(ass.len()).unwrap();
-        while d.read_cpu_counter() != i.into() {
-            d.computer().cycle(false);
-        }
-        assert_eq!(d.read_memory(1.into()), (-90).into());
-        assert_eq!(d.read_memory(0.into()), 2.into());
+        stack_test(&sub(), 3, 100, Some(10), vec![MemVal(1, -90), MemVal(0, 2)])
+    }
+
+    #[test]
+    fn test_sub_double_neg() {
+        stack_test(
+            &sub(),
+            3,
+            -100,
+            Some(10),
+            vec![MemVal(1, 110), MemVal(0, 2)],
+        )
     }
 
     #[test]
     fn test_neg() {
-        let mut rom = hack_interface::RomWriter::new();
-        let ass = neg();
-        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
-            rom.write_instruction(i);
-        }
-        let mut c = rom.create_load_rom();
-        let mut d = hack_interface::Debugger::new(&mut c);
-        d.write_memory(0.into(), 2.into()); // Stack pointer is past the number to negate
-        d.write_memory(1.into(), (-10).into());
-        let i = i16::try_from(ass.len()).unwrap();
-        while d.read_cpu_counter() != i.into() {
-            d.computer().cycle(false);
-        }
-        assert_eq!(d.read_memory(1.into()), 10.into());
-        assert_eq!(d.read_memory(0.into()), 2.into());
+        stack_test(
+            &neg(),
+            456,
+            100,
+            None,
+            vec![MemVal(455, -100), MemVal(0, 456)],
+        )
     }
 
     #[test]
-    fn test_eq_true() {
-        let mut rom = hack_interface::RomWriter::new();
-        let ass = eq();
-        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
-            rom.write_instruction(i);
-        }
-        let mut c = rom.create_load_rom();
-        let mut d = hack_interface::Debugger::new(&mut c);
-        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
-        d.write_memory(1.into(), 42.into()); // 42 is equal to
-        d.write_memory(2.into(), 42.into()); // 42
-        let i = i16::try_from(ass.len()).unwrap();
-        while d.read_cpu_counter() != i.into() {
-            d.computer().cycle(false);
-        }
-        assert_eq!(d.read_memory(1.into()), (-1).into());
-        assert_eq!(d.read_memory(0.into()), 2.into());
+    fn test_neg_neg() {
+        stack_test(
+            &neg(),
+            456,
+            -100,
+            None,
+            vec![MemVal(455, 100), MemVal(0, 456)],
+        )
+    }
+
+    #[test]
+    fn test_eq() {
+        stack_test(
+            &eq(),
+            3,
+            -100,
+            Some(-100),
+            vec![MemVal(1, -1), MemVal(0, 2)],
+        )
     }
 
     #[test]
     fn test_eq_false() {
-        let mut rom = hack_interface::RomWriter::new();
-        let ass = eq();
-        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
-            rom.write_instruction(i);
-        }
-        let mut c = rom.create_load_rom();
-        let mut d = hack_interface::Debugger::new(&mut c);
-        d.write_memory(0.into(), 3.into()); // Stack pointer past the two numbers
-        d.write_memory(1.into(), (-10).into()); // Not equal to
-        d.write_memory(2.into(), 42.into()); // 42
-        let i = i16::try_from(ass.len()).unwrap();
-        while d.read_cpu_counter() != i.into() {
-            d.computer().cycle(false);
-        }
-        assert_eq!(d.read_memory(1.into()), 0.into());
-        assert_eq!(d.read_memory(0.into()), 2.into());
+        stack_test(&eq(), 3, -100, Some(100), vec![MemVal(1, 0), MemVal(0, 2)])
     }
 }
