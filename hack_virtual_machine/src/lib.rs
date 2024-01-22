@@ -154,6 +154,38 @@ pub fn gt() -> [Assembly; 24] {
     ]
 }
 
+/// Virtual machine stack less than
+pub fn lt() -> [Assembly; 24] {
+    // For the comments, assume stack pointer at memory 0 points to 3
+    // The two numbers to compare at memory 1(X) and 2(Y)
+    [
+        ReservedSymbols::SP.into(), // A = 0 (stack pointer)
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(), // A = M[0] - 1 = 3 - 1 = 2 (top of stack)
+        CCommand::new_dest(CDest::D, CComp::M).into(),         // D = M[2] = Y
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(), // A = 1
+        CCommand::new_dest(CDest::M, CComp::MMinusD).into(),   // M[1] = X - Y
+        CCommand::new_dest(CDest::D, CComp::A).into(),         // D = 1
+        ReservedSymbols::SP.into(),                            // A = 0
+        CCommand::new_dest(CDest::M, CComp::D).into(), // M[0] = 1, stack pointer is at subtraction result
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] = 1
+        CCommand::new_dest(CDest::D, CComp::M).into(), // D = M[1] = X - Y
+        ACommand::Symbol("LT_TRUE".to_string()).into(), // Label to jump to if less than
+        CCommand::new_jump(CComp::D, CJump::Less).into(), // Jump if D is less than 0, otherwise not less than
+        ReservedSymbols::SP.into(),                       // A = 0
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] = 1 (address where true/false needs to be written)
+        CCommand::new_dest(CDest::M, CComp::Zero).into(), // M[1] = 0
+        ACommand::Symbol("LT_DONE".to_string()).into(), // Jump to setting stack pointer
+        CCommand::new_jump(CComp::Zero, CJump::Jump).into(), // Always jump to finishing assembly
+        Assembly::Label("LT_TRUE".to_string()),        // Start of code for greater than being true
+        ReservedSymbols::SP.into(),                    // A = 0
+        CCommand::new_dest(CDest::A, CComp::M).into(), // A = M[0] = 1, (address where true/false needs to be written)
+        CCommand::new_dest(CDest::M, CComp::MinumOne).into(), // M[1] = -1 (true, X and Y are equal)
+        Assembly::Label("LT_DONE".to_string()),        // Code for setting stack pointer
+        ReservedSymbols::SP.into(),                    // A = 0
+        CCommand::new_dest(CDest::M, CComp::MPlusOne).into(), // M[0] = M[0] + 1 = 1 + 1 = 2
+    ]
+}
+
 /// Errors during VM functioning
 #[derive(Debug)]
 pub enum Error {
@@ -328,5 +360,20 @@ mod vm_tests {
     #[test]
     fn test_gt_false_less() {
         stack_test(&gt(), 3, 10, Some(1), vec![MemVal(1, 0), MemVal(0, 2)])
+    }
+
+    #[test]
+    fn test_lt() {
+        stack_test(&lt(), 3, -1, Some(-2), vec![MemVal(1, -1), MemVal(0, 2)])
+    }
+
+    #[test]
+    fn test_lt_false_eq() {
+        stack_test(&lt(), 3, 1, Some(1), vec![MemVal(1, 0), MemVal(0, 2)])
+    }
+
+    #[test]
+    fn test_lt_false_greater() {
+        stack_test(&lt(), 3, 1, Some(10), vec![MemVal(1, 0), MemVal(0, 2)])
     }
 }
