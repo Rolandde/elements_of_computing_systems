@@ -109,7 +109,7 @@ impl CPU {
         let alu_y = gates::multiplexor_multibit_gate(reg_a, in_m, m_bit);
 
         let (calc, equal_0, less_0) = arithmetic::alu(reg_d, alu_y, c_bits);
-        let greater_0 = gates::not_gate(less_0);
+        let greater_0 = gates::not_gate(gates::or_gate(equal_0, less_0));
 
         self.reg_a.cycle(
             gates::multiplexor_multibit_gate(instruction, calc, c_instr),
@@ -516,6 +516,27 @@ mod cpu_tests {
         //Jump to 10 again, but this time reset is set, so should be 0
         out = cpu.cycle([false; 16], inst, true);
         assert_eq!(out.pc, to_15_bit(from_i16(0)));
+    }
+
+    #[test]
+    fn test_jump_greater_than_0() {
+        // Test that jump does not happen if jump is set to greater than 0 and computation is 0
+        let mut cpu = CPU::new();
+        let mut inst = [
+            false, // Set A register to 10
+            false, false, false, false, false, false, false, false, false, false, false, true,
+            false, true, false,
+        ];
+        cpu.cycle([false; 16], inst, false);
+
+        inst = [
+            true, true, true, false, // C instruction
+            true, false, true, false, true, false, // Computation yields 0
+            false, false, false, // Don't assign to anything
+            false, false, true, // Jump as A is greater than 0 (no jump)
+        ];
+        let out = cpu.cycle([false; 16], inst, false);
+        assert_eq!(out.pc, to_15_bit(from_i16(2)));
     }
 
     #[test]
