@@ -4,11 +4,10 @@ use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSym
 use hack_assembler::Assembly;
 
 /// Virtual machine stack addition.
-pub fn add() -> [Assembly; 9] {
+pub fn add() -> [Assembly; 8] {
     [
         ReservedSymbols::SP.into(),
-        CCommand::new_dest(CDest::A, CComp::M).into(),
-        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
         CCommand::new_dest(CDest::M, CComp::DPlusM).into(),
@@ -19,11 +18,10 @@ pub fn add() -> [Assembly; 9] {
 }
 
 /// Virtual machine stack subtraction.
-pub fn sub() -> [Assembly; 9] {
+pub fn sub() -> [Assembly; 8] {
     [
         ReservedSymbols::SP.into(),
-        CCommand::new_dest(CDest::A, CComp::M).into(),
-        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
         CCommand::new_dest(CDest::M, CComp::MMinusD).into(),
@@ -34,11 +32,10 @@ pub fn sub() -> [Assembly; 9] {
 }
 
 /// Virtual machine stack negation.
-pub fn neg() -> [Assembly; 4] {
+pub fn neg() -> [Assembly; 3] {
     [
         ReservedSymbols::SP.into(),
-        CCommand::new_dest(CDest::A, CComp::M).into(),
-        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
         CCommand::new_dest(CDest::M, CComp::MinusM).into(),
     ]
 }
