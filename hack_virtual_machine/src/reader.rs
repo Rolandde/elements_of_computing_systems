@@ -14,7 +14,7 @@ pub struct Reader<R> {
     args: u8,
     cmd: String,
     arg2: String,
-    arg3: u16,
+    arg3: i16,
     line: usize,
 }
 

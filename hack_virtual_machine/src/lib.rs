@@ -12,8 +12,8 @@ pub enum Command {
     Goto(String),
     If(String),
     Label(String),
-    Pop(Segment, u16),
-    Push(Segment, u16),
+    Pop(Segment, i16),
+    Push(Segment, i16),
 }
 
 #[derive(Debug, PartialEq, Eq)]
