@@ -49,13 +49,13 @@ impl std::str::FromStr for Segment {
 #[derive(Debug)]
 pub enum Error {
     /// The command has too few, too many, or wrong type of arguments
-    InvalidArgs(u16),
+    InvalidArgs(usize),
     /// Upstream IO error.
     Io(std::io::Error),
     /// The command is not part of the VM spec
-    UnknownCommand(u16),
+    UnknownCommand(usize),
     /// The segement is not part of the VM spec
-    UnknownSegment(u16),
+    UnknownSegment(usize),
 }
 
 impl std::fmt::Display for Error {

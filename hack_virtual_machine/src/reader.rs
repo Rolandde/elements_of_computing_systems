@@ -15,7 +15,7 @@ pub struct Reader<R> {
     cmd: String,
     arg2: String,
     arg3: u16,
-    line: u16,
+    line: usize,
 }
 
 impl<R: std::io::BufRead> Reader<R> {
@@ -48,7 +48,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert_eq!((a, b, c, d), (1, 2, 0, 0));
     /// # Ok::<(), hack_virtual_machine::Error>(())
     /// ```
-    pub fn read_line(&mut self) -> Result<u16, Error> {
+    pub fn read_line(&mut self) -> Result<usize, Error> {
         self.buffer.clear();
         let read = self.inner.read_line(&mut self.buffer)?;
         if read == 0 {
@@ -110,7 +110,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert_eq!((a, b, c), (3, 4, 0));
     /// # Ok::<(), hack_virtual_machine::Error>(())
     /// ```
-    pub fn read_command(&mut self) -> Result<u16, Error> {
+    pub fn read_command(&mut self) -> Result<usize, Error> {
         let mut line = self.read_line()?;
 
         while line != 0 && self.args == 0 {
