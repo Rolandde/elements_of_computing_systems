@@ -136,6 +136,43 @@ pub fn lt() -> [Assembly; 24] {
     ]
 }
 
+/// Virtual machine stack bitwise and.
+pub fn and() -> [Assembly; 8] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::M, CComp::DAndM).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Virtual machine stack bitwise or.
+pub fn or() -> [Assembly; 8] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        CCommand::new_dest(CDest::A, CComp::AMinusOne).into(),
+        CCommand::new_dest(CDest::M, CComp::DOrM).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Virtual machine stack bitwise not
+pub fn not() -> [Assembly; 3] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::M, CComp::NotM).into(),
+    ]
+}
+
 #[cfg(test)]
 mod vm_tests {
     use super::*;
@@ -280,5 +317,25 @@ mod vm_tests {
     #[test]
     fn test_lt_false_greater() {
         stack_test(&lt(), 3, 1, Some(10), vec![MemVal(1, 0), MemVal(0, 2)])
+    }
+
+    #[test]
+    fn test_and() {
+        stack_test(&and(), 3, 0, Some(0), vec![MemVal(1, 0), MemVal(0, 2)]);
+        stack_test(&and(), 3, -1, Some(0), vec![MemVal(1, 0), MemVal(0, 2)]);
+        stack_test(&and(), 3, -1, Some(-1), vec![MemVal(1, -1), MemVal(0, 2)]);
+    }
+
+    #[test]
+    fn test_or() {
+        stack_test(&or(), 3, 0, Some(0), vec![MemVal(1, 0), MemVal(0, 2)]);
+        stack_test(&or(), 3, -1, Some(0), vec![MemVal(1, -1), MemVal(0, 2)]);
+        stack_test(&or(), 3, -1, Some(-1), vec![MemVal(1, -1), MemVal(0, 2)]);
+    }
+
+    #[test]
+    fn test_not() {
+        stack_test(&not(), 3, 0, None, vec![MemVal(2, -1), MemVal(0, 3)]);
+        stack_test(&not(), 3, -1, None, vec![MemVal(2, 0), MemVal(0, 3)]);
     }
 }
