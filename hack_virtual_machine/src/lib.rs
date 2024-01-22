@@ -1,3 +1,12 @@
+/// Memory address at which static variables start
+pub const STATIC_START: i16 = 16;
+
+/// Memory address at which the start pointer starts
+pub const STACK_START: i16 = 256;
+
+/// Memory address at which the heap starts
+pub const HEAP_START: i16 = 2048;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Add,
