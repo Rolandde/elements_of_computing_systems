@@ -98,4 +98,5 @@ impl std::convert::From<std::io::Error> for Error {
 }
 
 pub mod arithmetic;
+pub mod memory;
 pub mod reader;
