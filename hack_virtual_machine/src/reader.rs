@@ -1,6 +1,6 @@
 //! Reader for .vm files.
 
-use crate::{Command, Error};
+use crate::{Command, Error, SegmentIndex};
 
 /// Reader that converts .vm files into [Command]s.
 ///
@@ -176,21 +176,11 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "push" => {
                 self.assert_args(3)?;
-                Ok(Command::Push(
-                    self.arg2
-                        .parse()
-                        .or(Err(Error::UnknownSegment(self.line)))?,
-                    self.arg3,
-                ))
+                Ok(Command::Push(self.parse_segment()?))
             }
             "pop" => {
                 self.assert_args(3)?;
-                Ok(Command::Pop(
-                    self.arg2
-                        .parse()
-                        .or(Err(Error::UnknownSegment(self.line)))?,
-                    self.arg3,
-                ))
+                Ok(Command::Pop(self.parse_segment()?))
             }
             _ => Err(Error::UnknownCommand(self.line)),
         }
@@ -201,6 +191,38 @@ impl<R: std::io::BufRead> Reader<R> {
             Err(Error::InvalidArgs(self.line))
         } else {
             Ok(())
+        }
+    }
+
+    fn parse_segment(&self) -> Result<SegmentIndex, Error> {
+        let seg = self
+            .arg2
+            .parse()
+            .or(Err(Error::UnknownSegment(self.line)))?;
+
+        match seg {
+            Segment::Argument => Ok(SegmentIndex::Argument(self.arg3)),
+            Segment::Local => Ok(SegmentIndex::Local(self.arg3)),
+            Segment::Static => Ok(SegmentIndex::Static(self.arg3)),
+            Segment::Constant => Ok(SegmentIndex::Constant(self.arg3)),
+            Segment::This => Ok(SegmentIndex::This(self.arg3)),
+            Segment::That => Ok(SegmentIndex::That(self.arg3)),
+            Segment::Pointer => match self.arg3 {
+                0 => Ok(SegmentIndex::PointerThis),
+                1 => Ok(SegmentIndex::PointerThat),
+                _ => Err(Error::OutOfBoundsIndex(self.line)),
+            },
+            Segment::Temp => match self.arg3 {
+                0 => Ok(SegmentIndex::Temp0),
+                1 => Ok(SegmentIndex::Temp1),
+                2 => Ok(SegmentIndex::Temp2),
+                3 => Ok(SegmentIndex::Temp3),
+                4 => Ok(SegmentIndex::Temp4),
+                5 => Ok(SegmentIndex::Temp5),
+                6 => Ok(SegmentIndex::Temp6),
+                7 => Ok(SegmentIndex::Temp7),
+                _ => Err(Error::OutOfBoundsIndex(self.line)),
+            },
         }
     }
 }
@@ -230,6 +252,34 @@ pub fn clean_line(line: &mut String) {
     let no_white_space = no_comments.trim();
     line.clear();
     line.push_str(no_white_space);
+}
+
+enum Segment {
+    Argument,
+    Local,
+    Static,
+    Constant,
+    This,
+    That,
+    Pointer,
+    Temp,
+}
+
+impl std::str::FromStr for Segment {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "argument" => Ok(Segment::Argument),
+            "local" => Ok(Segment::Local),
+            "static" => Ok(Segment::Static),
+            "constant" => Ok(Segment::Constant),
+            "this" => Ok(Segment::This),
+            "that" => Ok(Segment::That),
+            "pointer" => Ok(Segment::Pointer),
+            "temp" => Ok(Segment::Temp),
+            _ => Err(()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -262,7 +312,7 @@ mod vm_parser_tests {
         reader.read_command()?;
         assert_eq!(
             reader.parse_command()?,
-            Command::Push(crate::Segment::Local, 3)
+            Command::Push(crate::SegmentIndex::Local(3))
         );
         Ok(())
     }

@@ -21,37 +21,31 @@ pub enum Command {
     Goto(String),
     If(String),
     Label(String),
-    Pop(Segment, i16),
-    Push(Segment, i16),
+    Pop(SegmentIndex),
+    Push(SegmentIndex),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Segment {
-    Argument,
-    Local,
-    Static,
-    Constant,
-    This,
-    That,
-    Pointer,
-    Temp,
-}
-
-impl std::str::FromStr for Segment {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "argument" => Ok(Segment::Argument),
-            "local" => Ok(Segment::Local),
-            "static" => Ok(Segment::Static),
-            "constant" => Ok(Segment::Constant),
-            "this" => Ok(Segment::This),
-            "that" => Ok(Segment::That),
-            "pointer" => Ok(Segment::Pointer),
-            "temp" => Ok(Segment::Temp),
-            _ => Err(()),
-        }
-    }
+pub enum SegmentIndex {
+    Argument(i16),
+    Local(i16),
+    Static(i16),
+    Constant(i16),
+    This(i16),
+    That(i16),
+    // The pointer segment only has two positions
+    PointerThis,
+    PointerThat,
+    // The temp segment has 8 defined positions
+    Temp0,
+    Temp1,
+    Temp2,
+    Temp3,
+    Temp4,
+    Temp5,
+    Temp6,
+    Temp7,
+    Temp8,
 }
 
 /// Errors during VM functioning
@@ -65,6 +59,8 @@ pub enum Error {
     UnknownCommand(usize),
     /// The segement is not part of the VM spec
     UnknownSegment(usize),
+    /// Segment index is out of bounds
+    OutOfBoundsIndex(usize),
 }
 
 impl std::fmt::Display for Error {
@@ -76,6 +72,7 @@ impl std::fmt::Display for Error {
             Self::Io(e) => write!(f, "cannot read: {}", e),
             Self::UnknownCommand(line) => write!(f, "unknown command on line {}", line),
             Self::UnknownSegment(line) => write!(f, "unknown segment on line {}", line),
+            Self::OutOfBoundsIndex(line) => write!(f, "out of bounds index on line {}", line),
         }
     }
 }
@@ -87,6 +84,7 @@ impl std::error::Error for Error {
             Self::Io(e) => Some(e),
             Self::UnknownCommand(_) => None,
             Self::UnknownSegment(_) => None,
+            Self::OutOfBoundsIndex(_) => None,
         }
     }
 }
