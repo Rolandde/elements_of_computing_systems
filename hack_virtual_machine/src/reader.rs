@@ -188,7 +188,20 @@ impl<R: std::io::BufRead> Reader<R> {
         }
     }
 
-    fn parse_segment(&self) -> Result<SegmentIndex, Error> {
+    /// Parse the segment in the buffer.
+    ///
+    /// Assumes there is a segment in the buffer, but does all segment validity checking.
+    ///
+    /// # Examples
+    /// ```
+    /// let input = b"push local 7";
+    /// let mut reader = hack_virtual_machine::reader::Reader::new(&input[..]);
+    /// reader.read_command()?;
+    /// let add = reader.parse_segment()?;
+    /// assert_eq!(add, hack_virtual_machine::SegmentIndex::Local(7));
+    /// # Ok::<(), hack_virtual_machine::Error>(())
+    /// ```
+    pub fn parse_segment(&self) -> Result<SegmentIndex, Error> {
         self.assert_args(3)?;
         let seg = self
             .arg2
@@ -302,12 +315,17 @@ mod vm_parser_tests {
 
     #[test]
     fn test_segment() -> Result<(), Error> {
-        let input = b"push local 3";
+        let input = b"push pointer 1\npop temp 4";
         let mut reader = Reader::new(&input[..]);
         reader.read_command()?;
         assert_eq!(
             reader.parse_command()?,
-            Command::Push(crate::SegmentIndex::Local(3))
+            Command::Push(crate::SegmentIndex::PointerThat)
+        );
+        reader.read_command()?;
+        assert_eq!(
+            reader.parse_command()?,
+            Command::Pop(crate::SegmentIndex::Temp4)
         );
         Ok(())
     }
