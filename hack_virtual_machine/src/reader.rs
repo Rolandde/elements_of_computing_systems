@@ -174,14 +174,8 @@ impl<R: std::io::BufRead> Reader<R> {
                 self.assert_args(1)?;
                 Ok(Command::BitNot)
             }
-            "push" => {
-                self.assert_args(3)?;
-                Ok(Command::Push(self.parse_segment()?))
-            }
-            "pop" => {
-                self.assert_args(3)?;
-                Ok(Command::Pop(self.parse_segment()?))
-            }
+            "push" => Ok(Command::Push(self.parse_segment()?)),
+            "pop" => Ok(Command::Pop(self.parse_segment()?)),
             _ => Err(Error::UnknownCommand(self.line)),
         }
     }
@@ -195,6 +189,7 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 
     fn parse_segment(&self) -> Result<SegmentIndex, Error> {
+        self.assert_args(3)?;
         let seg = self
             .arg2
             .parse()
