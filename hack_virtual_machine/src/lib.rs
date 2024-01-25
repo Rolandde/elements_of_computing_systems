@@ -21,12 +21,12 @@ pub enum Command {
     Goto(String),
     If(String),
     Label(String),
-    Pop(SegmentIndex),
-    Push(SegmentIndex),
+    Pop(Segment),
+    Push(Segment),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum SegmentIndex {
+pub enum Segment {
     Argument(i16),
     Local(i16),
     Static(i16),

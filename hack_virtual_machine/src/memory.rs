@@ -38,10 +38,13 @@
 //! A=M // A stores the value to write to address in D
 //! A=D // A now has the address to write to, but it held the value to write, which is now lost
 //! ```
+//! So at least one other memory address is required to get this to work. As luck would have it, we have R13-R15 for the VM. Yay, let's use one of them.
+//!
+//! Fun simple exception: `pointer` and `temp` segment aren't pointers, but actuall memory addresses (R3-R12). They don't need an offset, so make slighlty easier assembly code.
 
 use std::convert::Into;
 
-use crate::SegmentIndex;
+use crate::Segment;
 use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
 use hack_assembler::Assembly;
 

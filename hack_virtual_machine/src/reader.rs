@@ -1,6 +1,6 @@
 //! Reader for .vm files.
 
-use crate::{Command, Error, SegmentIndex};
+use crate::{Command, Error, Segment};
 
 /// Reader that converts .vm files into [Command]s.
 ///
@@ -201,7 +201,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// assert_eq!(add, hack_virtual_machine::SegmentIndex::Local(7));
     /// # Ok::<(), hack_virtual_machine::Error>(())
     /// ```
-    pub fn parse_segment(&self) -> Result<SegmentIndex, Error> {
+    pub fn parse_segment(&self) -> Result<Segment, Error> {
         self.assert_args(3)?;
         let seg = self
             .arg2
@@ -209,26 +209,26 @@ impl<R: std::io::BufRead> Reader<R> {
             .or(Err(Error::UnknownSegment(self.line)))?;
 
         match seg {
-            Segment::Argument => Ok(SegmentIndex::Argument(self.arg3)),
-            Segment::Local => Ok(SegmentIndex::Local(self.arg3)),
-            Segment::Static => Ok(SegmentIndex::Static(self.arg3)),
-            Segment::Constant => Ok(SegmentIndex::Constant(self.arg3)),
-            Segment::This => Ok(SegmentIndex::This(self.arg3)),
-            Segment::That => Ok(SegmentIndex::That(self.arg3)),
-            Segment::Pointer => match self.arg3 {
-                0 => Ok(SegmentIndex::PointerThis),
-                1 => Ok(SegmentIndex::PointerThat),
+            SegmentName::Argument => Ok(Segment::Argument(self.arg3)),
+            SegmentName::Local => Ok(Segment::Local(self.arg3)),
+            SegmentName::Static => Ok(Segment::Static(self.arg3)),
+            SegmentName::Constant => Ok(Segment::Constant(self.arg3)),
+            SegmentName::This => Ok(Segment::This(self.arg3)),
+            SegmentName::That => Ok(Segment::That(self.arg3)),
+            SegmentName::Pointer => match self.arg3 {
+                0 => Ok(Segment::PointerThis),
+                1 => Ok(Segment::PointerThat),
                 _ => Err(Error::OutOfBoundsIndex(self.line)),
             },
-            Segment::Temp => match self.arg3 {
-                0 => Ok(SegmentIndex::Temp0),
-                1 => Ok(SegmentIndex::Temp1),
-                2 => Ok(SegmentIndex::Temp2),
-                3 => Ok(SegmentIndex::Temp3),
-                4 => Ok(SegmentIndex::Temp4),
-                5 => Ok(SegmentIndex::Temp5),
-                6 => Ok(SegmentIndex::Temp6),
-                7 => Ok(SegmentIndex::Temp7),
+            SegmentName::Temp => match self.arg3 {
+                0 => Ok(Segment::Temp0),
+                1 => Ok(Segment::Temp1),
+                2 => Ok(Segment::Temp2),
+                3 => Ok(Segment::Temp3),
+                4 => Ok(Segment::Temp4),
+                5 => Ok(Segment::Temp5),
+                6 => Ok(Segment::Temp6),
+                7 => Ok(Segment::Temp7),
                 _ => Err(Error::OutOfBoundsIndex(self.line)),
             },
         }
@@ -262,7 +262,7 @@ pub fn clean_line(line: &mut String) {
     line.push_str(no_white_space);
 }
 
-enum Segment {
+enum SegmentName {
     Argument,
     Local,
     Static,
@@ -273,18 +273,18 @@ enum Segment {
     Temp,
 }
 
-impl std::str::FromStr for Segment {
+impl std::str::FromStr for SegmentName {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "argument" => Ok(Segment::Argument),
-            "local" => Ok(Segment::Local),
-            "static" => Ok(Segment::Static),
-            "constant" => Ok(Segment::Constant),
-            "this" => Ok(Segment::This),
-            "that" => Ok(Segment::That),
-            "pointer" => Ok(Segment::Pointer),
-            "temp" => Ok(Segment::Temp),
+            "argument" => Ok(SegmentName::Argument),
+            "local" => Ok(SegmentName::Local),
+            "static" => Ok(SegmentName::Static),
+            "constant" => Ok(SegmentName::Constant),
+            "this" => Ok(SegmentName::This),
+            "that" => Ok(SegmentName::That),
+            "pointer" => Ok(SegmentName::Pointer),
+            "temp" => Ok(SegmentName::Temp),
             _ => Err(()),
         }
     }
@@ -320,13 +320,10 @@ mod vm_parser_tests {
         reader.read_command()?;
         assert_eq!(
             reader.parse_command()?,
-            Command::Push(crate::SegmentIndex::PointerThat)
+            Command::Push(crate::Segment::PointerThat)
         );
         reader.read_command()?;
-        assert_eq!(
-            reader.parse_command()?,
-            Command::Pop(crate::SegmentIndex::Temp4)
-        );
+        assert_eq!(reader.parse_command()?, Command::Pop(crate::Segment::Temp4));
         Ok(())
     }
 }
