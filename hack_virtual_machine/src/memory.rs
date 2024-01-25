@@ -44,9 +44,61 @@
 
 use std::convert::Into;
 
-use crate::Segment;
-use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
+use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, ReservedSymbols};
 use hack_assembler::Assembly;
+
+/// Segments that are pointers with offsets.
+pub enum SegmentPointer {
+    Argument(i16),
+    Local(i16),
+    This(i16),
+    That(i16),
+}
+
+pub fn push_pointer(segment: SegmentPointer) -> [Assembly; 11] {
+    let SegmentPoinerSplit { base, offset } = segment.split();
+    [
+        base.into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        offset.into(),
+        CCommand::new_dest(CDest::A, CComp::DPlusA).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+struct SegmentPoinerSplit {
+    base: ACommand,
+    offset: ACommand,
+}
+
+impl SegmentPointer {
+    fn split(&self) -> SegmentPoinerSplit {
+        match self {
+            Self::Argument(i) => SegmentPoinerSplit {
+                base: ReservedSymbols::ARG.into(),
+                offset: ACommand::Address(*i),
+            },
+            Self::Local(i) => SegmentPoinerSplit {
+                base: ReservedSymbols::LCL.into(),
+                offset: ACommand::Address(*i),
+            },
+            Self::This(i) => SegmentPoinerSplit {
+                base: ReservedSymbols::THIS.into(),
+                offset: ACommand::Address(*i),
+            },
+            Self::That(i) => SegmentPoinerSplit {
+                base: ReservedSymbols::THAT.into(),
+                offset: ACommand::Address(*i),
+            },
+        }
+    }
+}
 
 /*
 # push local 2
