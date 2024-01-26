@@ -55,12 +55,14 @@ pub enum SegmentPointer {
     That(i16),
 }
 
-pub fn push_pointer(segment: SegmentPointer) -> [Assembly; 11] {
-    let SegmentPoinerSplit { base, offset } = segment.split();
+/// Push onto the stack from a pointer.
+///
+/// The function asssumes a base that is a pointer (ARG, LCL, THIS, THAT). Other reserved symbol won't cause an error, but you will get wrong behaviour. Other reserved symbols aren't pointers, so dereferencing them (which this function does) will lead to to strange places.
+pub fn push_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 11] {
     [
         base.into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
-        offset.into(),
+        ACommand::Address(offset).into(),
         CCommand::new_dest(CDest::A, CComp::DPlusA).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         ReservedSymbols::SP.into(),
@@ -70,34 +72,6 @@ pub fn push_pointer(segment: SegmentPointer) -> [Assembly; 11] {
         ReservedSymbols::SP.into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
     ]
-}
-
-struct SegmentPoinerSplit {
-    base: ACommand,
-    offset: ACommand,
-}
-
-impl SegmentPointer {
-    fn split(&self) -> SegmentPoinerSplit {
-        match self {
-            Self::Argument(i) => SegmentPoinerSplit {
-                base: ReservedSymbols::ARG.into(),
-                offset: ACommand::Address(*i),
-            },
-            Self::Local(i) => SegmentPoinerSplit {
-                base: ReservedSymbols::LCL.into(),
-                offset: ACommand::Address(*i),
-            },
-            Self::This(i) => SegmentPoinerSplit {
-                base: ReservedSymbols::THIS.into(),
-                offset: ACommand::Address(*i),
-            },
-            Self::That(i) => SegmentPoinerSplit {
-                base: ReservedSymbols::THAT.into(),
-                offset: ACommand::Address(*i),
-            },
-        }
-    }
 }
 
 /*
