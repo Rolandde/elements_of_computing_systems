@@ -57,7 +57,7 @@ pub enum SegmentPointer {
 
 /// Push onto the stack from a pointer.
 ///
-/// The function asssumes a base that is a pointer (ARG, LCL, THIS, THAT). Other reserved symbol won't cause an error, but you will get wrong behaviour. Other reserved symbols aren't pointers, so dereferencing them (which this function does) will lead to to strange places.
+/// The function asssumes a base that is a pointer (ARG, LCL, THIS, THAT). Other reserved symbol won't cause an error, but you will get wrong behaviour. Other reserved symbols aren't pointers, so dereferencing them (which this function does) will lead you to strange places.
 pub fn push_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 11] {
     [
         base.into(),
@@ -70,6 +70,30 @@ pub fn push_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 11] {
         CCommand::new_dest(CDest::M, CComp::D).into(),
         CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
         ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Pop a value from the stack from a pointer.
+///
+/// The function assumes a base that is a pointer (ARG, LCL, THIS, THAT). So same warning as [push_pointer] if you break that assumption.
+pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 13] {
+    [
+        base.into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ACommand::Address(offset).into(),
+        CCommand::new_dest(CDest::D, CComp::DPlusA).into(),
+        ReservedSymbols::R13.into(), // Address to write to
+        CCommand::new_dest(CDest::M, CComp::D).into(), // is saved to all purpose register
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::D, CComp::MMinusOne).into(),
+        // The next two instructions set M[0] to the top stack address and then set the A register to that address. Are you tempted to write MA=D?
+        // Don't. The CPU sets A register and then instructs the computer to write to that memory
+        // You'd be writing the top of the stack address at that address (M[288] = 288)
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+        CCommand::new_dest(CDest::A, CComp::D).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ReservedSymbols::R13.into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
     ]
 }
