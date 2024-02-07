@@ -174,7 +174,7 @@ pub fn not() -> [Assembly; 3] {
 }
 
 #[cfg(test)]
-mod vm_tests {
+mod vm_arithmetic_tests {
     use super::*;
     use std::convert::TryFrom;
 

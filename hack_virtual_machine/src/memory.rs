@@ -105,7 +105,7 @@ pub fn push_value(from: ReservedSymbols) -> [Assembly; 8] {
 /// Pop a value from the stack from a pointer.
 ///
 /// The function assumes a base that is a pointer (ARG, LCL, THIS, THAT). So same warning as [push_pointer] if you break that assumption.
-pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 12] {
+pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 13] {
     [
         base.into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
@@ -121,6 +121,56 @@ pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 12] {
         CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         crate::MEM_POP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
     ]
+}
+
+#[cfg(test)]
+mod vm_memory_tests {
+    use super::*;
+
+    #[test]
+    fn test_push_pointer() {
+        let vm_mem = push_pointer(ReservedSymbols::ARG, 3);
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+        d.write_memory(ReservedSymbols::ARG.into(), 1000.into()); // ARG is pointing to 1000
+        d.write_memory(1003.into(), 42.into()); // 1003 because the offset is 3
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 301.into()); // The stack is incremented by 1
+        assert_eq!(d.read_memory(300.into()), 42.into()); // And the previous top of the stack has 42 written to it
+    }
+
+    #[test]
+    fn test_pop_pointer() {
+        let vm_mem = pop_pointer(ReservedSymbols::LCL, 0);
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+        d.write_memory(299.into(), 42.into()); // Top of stack is 42
+        d.write_memory(ReservedSymbols::LCL.into(), 1000.into()); // LCL is pointing to 1000
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 299.into()); // The stack is down by 1
+        assert_eq!(d.read_memory(1000.into()), 42.into()); // And the LCL segment has 42 written to it
+    }
 }
