@@ -1,8 +1,5 @@
 use hack_assembler::parts::ReservedSymbols;
 
-/// Memory address at which static variables start
-pub const STATIC_START: i16 = 16;
-
 /// Memory address at which the start pointer starts
 pub const STACK_START: i16 = 256;
 

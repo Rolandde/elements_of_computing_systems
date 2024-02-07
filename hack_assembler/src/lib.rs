@@ -170,6 +170,7 @@ mod assembly_tests {
 
 #[cfg(test)]
 mod book_tests {
+    use super::*;
 
     /// Machine code to add 2 and 3 and store result to RAM\[0\].
     pub const TWO_PLUS_THREE: &'static str = "0000000000000010
@@ -283,5 +284,25 @@ mod book_tests {
         assert_eq!(PICK_MAX.as_bytes(), machine_code.as_ref());
 
         Ok(())
+    }
+
+    // This was added while I was writing the VM static memory management
+    // I wrote a bad test and thought there was an error in how symbols are resolved
+    // I didn't see any explicit testing of symbols, so I wrote them and they passed (and I realized VM tests were bad)
+    #[test]
+    fn test_symbols() {
+        let mut a = Assembler::new(SymbolTable::empty());
+        let l1 = a
+            .pass_line(&Assembly::A(ACommand::Symbol("test.1".to_string())))
+            .unwrap();
+        assert_eq!(l1, 16.into());
+        let l2 = a
+            .pass_line(&Assembly::A(ACommand::Symbol("test.2".to_string())))
+            .unwrap();
+        assert_eq!(l2, 17.into());
+        let l3 = a
+            .pass_line(&Assembly::A(ACommand::Symbol("test.1".to_string()))) // Same symbol as the first
+            .unwrap();
+        assert_eq!(l3, 16.into());
     }
 }

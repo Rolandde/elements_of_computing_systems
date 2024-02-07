@@ -75,9 +75,12 @@ pub fn push_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 11] {
 }
 
 /// Push onto the stack from the static segment.
-pub fn push_static(offset: i16) -> [Assembly; 8] {
+///
+/// Static segments are weird. The filename and int make for a unique ID to always get the same memory address.
+pub fn push_static(filename: &str, int: i16) -> [Assembly; 8] {
+    let symbol = format!("{filename}.{int}");
     [
-        ACommand::Address(crate::STATIC_START + offset).into(),
+        ACommand::Symbol(symbol).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         ReservedSymbols::SP.into(),
         CCommand::new_dest(CDest::A, CComp::M).into(),
@@ -124,6 +127,21 @@ pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 13] {
         CCommand::new_dest(CDest::D, CComp::M).into(),
         crate::MEM_POP.into(),
         CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Pop from the stack into the static segment.
+///
+/// Static segments are weird. The filename and int make for a unique ID to always get the same memory address.
+pub fn pop_static(filename: &str, int: i16) -> [Assembly; 6] {
+    let symbol = format!("{filename}.{int}");
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ACommand::Symbol(symbol).into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
     ]
 }
@@ -230,5 +248,61 @@ mod vm_memory_tests {
 
         assert_eq!(d.read_memory(0.into()), 299.into()); // The stack is down by 1
         assert_eq!(d.read_memory(ReservedSymbols::THAT.into()), 42.into()); // And THAT has 42 written to it
+    }
+
+    #[test]
+    fn test_push_static() {
+        let vm_mem1 = push_static("file", 10);
+        let vm_mem2 = push_static("file2", 10);
+        // 30 minutes were lost because I `assemble_from_slice` once for each array of assembly code (two times in total)
+        // Well, each time you get a new symbol table, so the two different static segments both got the same memory address (16)
+        // The right approach below is to combine the assembly code into one stream (which is why assembly is all in one file)
+        let vm_mem = [vm_mem1, vm_mem2].concat();
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+        d.write_memory(16.into(), 42.into()); // Static segment starts at 16
+        d.write_memory(17.into(), 24.into()); // Two static segments are used, so next one is 17
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 302.into()); // Two push calls means stack is up by 2
+        assert_eq!(d.read_memory(300.into()), 42.into()); // First static push
+        assert_eq!(d.read_memory(301.into()), 24.into()); // Second static push
+    }
+
+    #[test]
+    fn test_pop_static() {
+        let vm_mem1 = pop_static("file", 10);
+        let vm_mem2 = pop_static("file2", 10);
+        // 30 minutes were lost because I `assemble_from_slice` once for each array of assembly code (two times in total)
+        // Well, each time you get a new symbol table, so the two different static segments both got the same memory address (16)
+        // The right approach below is to combine the assembly code into one stream (which is why assembly is all in one file)
+        let vm_mem = [vm_mem1, vm_mem2].concat();
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+        d.write_memory(299.into(), 42.into()); // Top of stack is 42
+        d.write_memory(298.into(), 24.into()); // Next on stack is 24
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 298.into()); // Two pop calls means stack is down by 2
+        assert_eq!(d.read_memory(16.into()), 42.into()); // First static push
+        assert_eq!(d.read_memory(17.into()), 24.into()); // Second static push
     }
 }
