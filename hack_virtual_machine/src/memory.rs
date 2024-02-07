@@ -88,7 +88,9 @@ pub fn push_static(offset: i16) -> [Assembly; 8] {
     ]
 }
 
-/// Push the value at that address onto the stack
+/// Push the value at that address onto the stack.
+///
+/// This assumes that the reserved symbol stores the value directly. This means pointer and temp segments.
 pub fn push_value(from: ReservedSymbols) -> [Assembly; 8] {
     [
         from.into(),
@@ -102,7 +104,7 @@ pub fn push_value(from: ReservedSymbols) -> [Assembly; 8] {
     ]
 }
 
-/// Pop a value from the stack from a pointer.
+/// Pop a value from the stack to a pointer.
 ///
 /// The function assumes a base that is a pointer (ARG, LCL, THIS, THAT). So same warning as [push_pointer] if you break that assumption.
 pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 13] {
@@ -122,6 +124,20 @@ pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 13] {
         CCommand::new_dest(CDest::D, CComp::M).into(),
         crate::MEM_POP.into(),
         CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Pop the value from the stack to an address.
+///
+/// This assumes that the reserved symbol stores the value directly. This means pointer and temp segments.
+pub fn pop_value(to: ReservedSymbols) -> [Assembly; 6] {
+    [
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        to.into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
     ]
 }
@@ -172,5 +188,47 @@ mod vm_memory_tests {
 
         assert_eq!(d.read_memory(0.into()), 299.into()); // The stack is down by 1
         assert_eq!(d.read_memory(1000.into()), 42.into()); // And the LCL segment has 42 written to it
+    }
+
+    #[test]
+    fn test_push_value() {
+        let vm_mem = push_value(ReservedSymbols::R10);
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+        d.write_memory(ReservedSymbols::R10.into(), 42.into()); // Temp is holding 42
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 301.into()); // The stack is incremented by 1
+        assert_eq!(d.read_memory(300.into()), 42.into()); // And the previous top of the stack has 42 written to it
+    }
+
+    #[test]
+    fn test_pop_value() {
+        let vm_mem = pop_value(ReservedSymbols::THAT);
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+        d.write_memory(299.into(), 42.into()); // Top of stack is 42
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 299.into()); // The stack is down by 1
+        assert_eq!(d.read_memory(ReservedSymbols::THAT.into()), 42.into()); // And THAT has 42 written to it
     }
 }
