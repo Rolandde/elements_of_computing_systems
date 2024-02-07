@@ -107,6 +107,22 @@ pub fn push_value(from: ReservedSymbols) -> [Assembly; 8] {
     ]
 }
 
+/// Push this value onto the stack.
+///
+/// Note there is no pop_constant function. The constant segment is virtual, so putting something into it is pointless. The VM won't generate any assembly code for it.
+pub fn push_constant(cnst: i16) -> [Assembly; 8] {
+    [
+        ACommand::Address(cnst).into(),
+        CCommand::new_dest(CDest::D, CComp::A).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
 /// Pop a value from the stack to a pointer.
 ///
 /// The function assumes a base that is a pointer (ARG, LCL, THIS, THAT). So same warning as [push_pointer] if you break that assumption.
@@ -304,5 +320,25 @@ mod vm_memory_tests {
         assert_eq!(d.read_memory(0.into()), 298.into()); // Two pop calls means stack is down by 2
         assert_eq!(d.read_memory(16.into()), 42.into()); // First static push
         assert_eq!(d.read_memory(17.into()), 24.into()); // Second static push
+    }
+
+    #[test]
+    fn test_push_constant() {
+        let vm_mem = push_constant(42);
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_mem).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 300.into()); // Stack is at 300
+
+        let i = i16::try_from(vm_mem.len()).unwrap();
+        while d.read_cpu_counter() != i.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 301.into()); // The stack is incremented by 1
+        assert_eq!(d.read_memory(300.into()), 42.into()); // And the previous top of the stack has 42 written to it
     }
 }
