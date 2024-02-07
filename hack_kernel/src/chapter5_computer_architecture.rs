@@ -103,7 +103,7 @@ impl CPU {
         // or greater than 0 (third bit true). Notice that if all bits are true, jump will happen.
         let j_bits = [instruction[13], instruction[14], instruction[15]];
 
-        let reg_a = self.reg_a.probe();
+        let mut reg_a = self.reg_a.probe();
         let reg_d = self.reg_d.probe();
         // The a bit determines if we are using value of A register or the value of the address it points to
         let alu_y = gates::multiplexor_multibit_gate(reg_a, in_m, m_bit);
@@ -122,6 +122,8 @@ impl CPU {
         // A instruction will never write to D register
         self.reg_d.cycle(calc, gates::and_gate(c_instr, d_bits[1]));
 
+        reg_a = self.reg_a.probe();
+
         let mut jump = gates::and_gate(j_bits[0], less_0);
         jump = gates::or_gate(jump, gates::and_gate(j_bits[1], equal_0));
         jump = gates::or_gate(jump, gates::and_gate(j_bits[2], greater_0));
@@ -134,6 +136,8 @@ impl CPU {
         let next = self.counter.probe();
 
         // The first bit acts as the control bit and is not part of the address
+        // The address is of the A register now rather than at the beginning of the cycle
+        // The previous version was buggy, storing `reg_a` before the cycle and then using it here. The CPU doesn't have anywhere to store it!!!
         let address_m = [
             reg_a[1], reg_a[2], reg_a[3], reg_a[4], reg_a[5], reg_a[6], reg_a[7], reg_a[8],
             reg_a[9], reg_a[10], reg_a[11], reg_a[12], reg_a[13], reg_a[14], reg_a[15],
@@ -482,7 +486,7 @@ mod cpu_tests {
         assert_eq!(cpu.reg_d.cycle([false; 16], false), from_i16(-9876));
         assert_eq!(out.write_m, true);
         assert_eq!(out.out_m, from_i16(-9876));
-        assert_eq!(out.address_m, to_15_bit(from_i16(9876)));
+        assert_eq!(out.address_m, to_15_bit(from_i16(-9876)));
         assert_eq!(out.pc, to_15_bit(from_i16(2)));
     }
 
