@@ -198,7 +198,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// let mut reader = hack_virtual_machine::reader::Reader::new(&input[..]);
     /// reader.read_command()?;
     /// let add = reader.parse_segment()?;
-    /// assert_eq!(add, hack_virtual_machine::SegmentIndex::Local(7));
+    /// assert_eq!(add, hack_virtual_machine::Segment::Local(7));
     /// # Ok::<(), hack_virtual_machine::Error>(())
     /// ```
     pub fn parse_segment(&self) -> Result<Segment, Error> {

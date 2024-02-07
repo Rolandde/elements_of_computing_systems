@@ -1,3 +1,5 @@
+use hack_assembler::parts::ReservedSymbols;
+
 /// Memory address at which static variables start
 pub const STATIC_START: i16 = 16;
 
@@ -6,6 +8,9 @@ pub const STACK_START: i16 = 256;
 
 /// Memory address at which the heap starts
 pub const HEAP_START: i16 = 2048;
+
+/// This virtual register will hold the popped value
+pub const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {

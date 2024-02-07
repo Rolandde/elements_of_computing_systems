@@ -74,26 +74,53 @@ pub fn push_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 11] {
     ]
 }
 
+/// Push onto the stack from the static segment.
+pub fn push_static(offset: i16) -> [Assembly; 8] {
+    [
+        ACommand::Address(crate::STATIC_START + offset).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
+/// Push the value at that address onto the stack
+pub fn push_value(from: ReservedSymbols) -> [Assembly; 8] {
+    [
+        from.into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+        CCommand::new_dest(CDest::D, CComp::APlusOne).into(),
+        ReservedSymbols::SP.into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+    ]
+}
+
 /// Pop a value from the stack from a pointer.
 ///
 /// The function assumes a base that is a pointer (ARG, LCL, THIS, THAT). So same warning as [push_pointer] if you break that assumption.
-pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 13] {
+pub fn pop_pointer(base: ReservedSymbols, offset: i16) -> [Assembly; 12] {
     [
         base.into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         ACommand::Address(offset).into(),
         CCommand::new_dest(CDest::D, CComp::DPlusA).into(),
-        ReservedSymbols::R13.into(), // Address to write to
+        crate::MEM_POP.into(),                         // Address to write to
         CCommand::new_dest(CDest::M, CComp::D).into(), // is saved to all purpose register
         ReservedSymbols::SP.into(),
-        CCommand::new_dest(CDest::D, CComp::MMinusOne).into(),
-        // The next two instructions set M[0] to the top stack address and then set the A register to that address. Are you tempted to write MA=D?
+        // The next two instructions set M[0] to the top stack address and then set the A register to that address. Are you tempted to write MA=M-1?
         // Don't. The CPU sets A register and then instructs the computer to write to that memory
         // You'd be writing the top of the stack address at that address (M[288] = 288)
-        CCommand::new_dest(CDest::M, CComp::D).into(),
-        CCommand::new_dest(CDest::A, CComp::D).into(),
+        CCommand::new_dest(CDest::M, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
-        ReservedSymbols::R13.into(),
+        crate::MEM_POP.into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
     ]
 }
