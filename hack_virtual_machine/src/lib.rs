@@ -1,4 +1,9 @@
-use hack_assembler::parts::ReservedSymbols;
+//! The supremly stacked virtual machine.
+//!
+//! # Equal, greater than, less than arithmetic commands
+//! These are special, because they have jump statments within them. The book didn't hint at them being anything special and I couldn't think of a way of doing it without jumping. The jumps addresses are marked with labels. This means that the assembly code for these VM commands can only be inserted once. Using absolute addresses would allow you to insert it multiple times, but then the VM would have to keep track of them. My approach was to stick with labels and insert each assembly block once during compilation. The VM ensures that the R13 register is set to the next command that needs to be executed once the comparison operation has finished.
+
+use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
 use hack_assembler::Assembly;
 
 /// Memory address at which the start pointer starts
@@ -7,8 +12,119 @@ pub const STACK_START: i16 = 256;
 /// Memory address at which the heap starts
 pub const HEAP_START: i16 = 2048;
 
+/// This virtual register holds the address to return to after arithmetic comparisons
+pub const MEM_ARITH: ReservedSymbols = ReservedSymbols::R13;
+
 /// This virtual register will hold the popped value
 pub const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
+
+/// The stacked virtual machine
+pub struct VirtualMachine {
+    command_lines: i16,
+    translated: Vec<AssemblyLine>,
+}
+
+impl VirtualMachine {
+    pub fn new() -> Self {
+        Self {
+            command_lines: 0,
+            translated: Vec::new(),
+        }
+    }
+
+    pub fn init(&mut self) -> &[AssemblyLine] {
+        self.translated.extend([
+            AssemblyLine::Comment("Set stack pointer".to_string()),
+            AssemblyLine::Assembly(ACommand::Address(STACK_START).into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+            AssemblyLine::Assembly(ReservedSymbols::SP.into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+        ]);
+
+        // Equality assembly
+        self.translated.extend([
+            AssemblyLine::Comment("equality".to_string()),
+            Assembly::Label("EQ".to_string()).into(),
+        ]);
+        for a in arithmetic::eq() {
+            self.translated.push(a.into())
+        }
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                MEM_ARITH.into(),
+                "set by the VM before jump to this assembly block".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+
+        // Greater than assembly
+        self.translated.extend([
+            AssemblyLine::Comment("greater than".to_string()),
+            Assembly::Label("GT".to_string()).into(),
+        ]);
+        for a in arithmetic::gt() {
+            self.translated.push(a.into())
+        }
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                MEM_ARITH.into(),
+                "set by the VM before jump to this assembly block".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+
+        // Less than assembly
+        self.translated.extend([
+            AssemblyLine::Comment("less than".to_string()),
+            Assembly::Label("LT".to_string()).into(),
+        ]);
+        for a in arithmetic::lt() {
+            self.translated.push(a.into())
+        }
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                MEM_ARITH.into(),
+                "set by the VM before jump to this assembly block".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+
+        for a in &self.translated {
+            if a.is_command() {
+                self.command_lines += 1;
+            }
+        }
+        &self.translated
+    }
+
+    pub fn compile(&mut self, vm_command: &Command) -> &[AssemblyLine] {
+        self.translated.clear();
+        match vm_command {
+            Command::Add => {
+                for a in arithmetic::add() {
+                    self.translated.push(a.into())
+                }
+            }
+            Command::GreaterThan => {
+                let return_address = self.command_lines + 6;
+                let gt = [
+                    AssemblyLine::Comment("calling greater than".to_string()),
+                    AssemblyLine::AssemblyComment(
+                        ACommand::Address(return_address).into(),
+                        "return address calculated by VM".to_string(),
+                    ),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+                    AssemblyLine::Assembly(MEM_ARITH.into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol("GT".to_string()).into()),
+                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+                ];
+            }
+            _ => panic!("AHHHHHHHHHHHHHHHHHHH"),
+        };
+        &self.translated
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -99,6 +215,17 @@ pub enum AssemblyLine {
     Assembly(Assembly),
 }
 
+impl AssemblyLine {
+    /// Will this assembly line yield machine instructions. See [Assembly::is_command()].
+    pub fn is_command(&self) -> bool {
+        match self {
+            Self::Comment(_) => false,
+            Self::AssemblyComment(a, _) => a.is_command(),
+            Self::Assembly(a) => a.is_command(),
+        }
+    }
+}
+
 impl std::fmt::Display for AssemblyLine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -106,6 +233,12 @@ impl std::fmt::Display for AssemblyLine {
             Self::AssemblyComment(a, s) => write!(f, "{a} //{s}"),
             Self::Assembly(a) => write!(f, "{a}"),
         }
+    }
+}
+
+impl std::convert::From<Assembly> for AssemblyLine {
+    fn from(value: Assembly) -> Self {
+        Self::Assembly(value)
     }
 }
 

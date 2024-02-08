@@ -26,6 +26,28 @@ pub enum Assembly {
     Label(String),
 }
 
+impl Assembly {
+    /// Is this enum member a command that will be assembled to a machine instruction?
+    ///
+    /// Not all parsed assembly lines get the honor of being machine instructions.
+    ///
+    /// # Examples
+    /// ```
+    /// use hack_assembler::Assembly;
+    /// use hack_assembler::parts::ACommand;
+    /// assert!(Assembly::A(ACommand::Address(42)).is_command());
+    /// assert!(!Assembly::Label("not_a_command_just_a_label".to_string()).is_command());
+    /// ```
+    pub fn is_command(&self) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::A(_) => true,
+            Self::C(_) => true,
+            Self::Label(_) => false,
+        }
+    }
+}
+
 impl std::fmt::Display for Assembly {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
