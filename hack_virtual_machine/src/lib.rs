@@ -1,4 +1,5 @@
 use hack_assembler::parts::ReservedSymbols;
+use hack_assembler::Assembly;
 
 /// Memory address at which the start pointer starts
 pub const STACK_START: i16 = 256;
@@ -48,6 +49,23 @@ pub enum Segment {
     Temp6,
     Temp7,
     Temp8,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum AssemblyLine {
+    Comment(String),
+    AssemblyComment(Assembly, String),
+    Assembly(Assembly),
+}
+
+impl std::fmt::Display for AssemblyLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Comment(s) => write!(f, "//{s}"),
+            Self::AssemblyComment(a, s) => write!(f, "{a} //{s}"),
+            Self::Assembly(a) => write!(f, "{a}"),
+        }
+    }
 }
 
 /// Errors during VM functioning
