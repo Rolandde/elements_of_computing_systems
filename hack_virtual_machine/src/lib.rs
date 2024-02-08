@@ -21,11 +21,29 @@ pub enum Command {
     BitAnd,
     BitOr,
     BitNot,
-    Goto(String),
-    If(String),
-    Label(String),
+    // Goto(String),
+    // If(String),
+    // Label(String),
     Pop(Segment),
     Push(Segment),
+}
+
+impl std::fmt::Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => write!(f, "add"),
+            Self::Subtract => write!(f, "sub"),
+            Self::Negative => write!(f, "neg"),
+            Self::Equal => write!(f, "eq"),
+            Self::GreaterThan => write!(f, "gt"),
+            Self::LessThan => write!(f, "lt"),
+            Self::BitAnd => write!(f, "and"),
+            Self::BitOr => write!(f, "or"),
+            Self::BitNot => write!(f, "not"),
+            Self::Pop(s) => write!(f, "pop {s}"),
+            Self::Push(s) => write!(f, "push {s}"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -48,9 +66,32 @@ pub enum Segment {
     Temp5,
     Temp6,
     Temp7,
-    Temp8,
 }
 
+impl std::fmt::Display for Segment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Argument(i) => write!(f, "argument {i}"),
+            Self::Local(i) => write!(f, "local {i}"),
+            Self::Static(i) => write!(f, "static {i}"),
+            Self::Constant(i) => write!(f, "constant {i}"),
+            Self::This(i) => write!(f, "this {i}"),
+            Self::That(i) => write!(f, "that {i}"),
+            Self::PointerThis => write!(f, "pointer 0"),
+            Self::PointerThat => write!(f, "pointer 1"),
+            Self::Temp0 => write!(f, "temp 0"),
+            Self::Temp1 => write!(f, "temp 1"),
+            Self::Temp2 => write!(f, "temp 2"),
+            Self::Temp3 => write!(f, "temp 3"),
+            Self::Temp4 => write!(f, "temp 4"),
+            Self::Temp5 => write!(f, "temp 5"),
+            Self::Temp6 => write!(f, "temp 6"),
+            Self::Temp7 => write!(f, "temp 7"),
+        }
+    }
+}
+
+/// VM translation produces assembly alongside very helpful comments
 #[derive(Debug, PartialEq, Eq)]
 pub enum AssemblyLine {
     Comment(String),
