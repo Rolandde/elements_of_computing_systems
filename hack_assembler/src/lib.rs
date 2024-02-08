@@ -26,6 +26,17 @@ pub enum Assembly {
     Label(String),
 }
 
+impl std::fmt::Display for Assembly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, ""),
+            Self::A(a) => write!(f, "{a}"),
+            Self::C(c) => write!(f, "{c}"),
+            Self::Label(s) => write!(f, "({s})"),
+        }
+    }
+}
+
 /// Convert one [Assembly] line at a time into machine code.
 ///
 /// [SymbolTable] must be created by [FirstPass] if labels are in the assembly file.

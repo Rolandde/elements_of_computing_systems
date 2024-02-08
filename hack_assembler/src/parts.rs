@@ -177,6 +177,16 @@ impl std::convert::From<ACommand> for crate::Assembly {
     }
 }
 
+impl std::fmt::Display for ACommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Address(i) => write!(f, "@{i}"),
+            Self::Reserved(r) => write!(f, "@{r}"),
+            Self::Symbol(s) => write!(f, "@{s}"),
+        }
+    }
+}
+
 /// A parsed C command, holding a destination, a computation, and a jump part.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct CCommand {
