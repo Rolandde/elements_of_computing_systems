@@ -7,3 +7,5 @@ members = [
     "hack_computer",
     "hack_virtual_machine",
 ]
+
+resolver = "2"
