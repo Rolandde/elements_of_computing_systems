@@ -40,7 +40,7 @@ impl VirtualMachine {
     /// Sets up stack and common calls.
     ///
     /// Call this immediatly after createring the VM and before running [VirtualMachine::compile]. The stack won't be there if you don't.
-    pub fn init(&mut self) -> &[AssemblyLine] {
+    pub fn init(&mut self, assembly: &mut Vec<AssemblyLine>) {
         self.translated.extend([
             AssemblyLine::Comment("Set stack pointer".to_string()),
             AssemblyLine::Assembly(ACommand::Address(STACK_START).into()),
@@ -58,13 +58,15 @@ impl VirtualMachine {
                 self.command_lines += 1;
             }
         }
-        &self.translated
+        for a in self.translated.drain(..) {
+            assembly.push(a)
+        }
     }
 
     /// Compile a VM line into assembly.
     ///
     /// It is possible that no assembly will be produced by this call. Calling `pop const 42` does nothing. Future optimizers might take a VM line and not compile it until the next ones are seen. (I have no intention of going down the optimizer road).
-    pub fn compile(&mut self, vm_command: &Command) -> &[AssemblyLine] {
+    pub fn compile(&mut self, vm_command: &Command, assembly: &mut Vec<AssemblyLine>) {
         self.translated.clear();
         match vm_command {
             Command::Add => {
@@ -156,7 +158,15 @@ impl VirtualMachine {
                 }
             },
         };
-        &self.translated
+        for a in &self.translated {
+            if a.is_command() {
+                self.command_lines += 1;
+            }
+        }
+
+        for a in self.translated.drain(..) {
+            assembly.push(a)
+        }
     }
 
     fn init_equlity(&mut self, assembly: [Assembly; 24], label: String) {
