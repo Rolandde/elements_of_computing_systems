@@ -72,7 +72,6 @@ impl VirtualMachine {
         vm_command: &Command,
         assembly: &mut impl std::iter::Extend<AssemblyLine>,
     ) {
-        self.translated.clear();
         match vm_command {
             Command::Add => {
                 self.add_comment("ADD".to_string());
@@ -163,6 +162,26 @@ impl VirtualMachine {
                 }
             },
         };
+        for a in &self.translated {
+            if a.is_command() {
+                self.command_lines += 1;
+            }
+        }
+
+        assembly.extend(self.translated.drain(..));
+    }
+
+    /// Writes out any remaining assembly code.
+    ///
+    /// This must be called before assembly. If optimization was implemented (and it's not), command might have been cached that will be compiled here. For now, this adds an infiniate loop at the end of the program.
+    pub fn finish(mut self, assembly: &mut impl std::iter::Extend<AssemblyLine>) {
+        self.add_comment("Infinite loop at end of program".into());
+        self.translated.extend([
+            AssemblyLine::Assembly(ACommand::Symbol("ENDLOOP".to_string()).into()),
+            AssemblyLine::Assembly(ACommand::Symbol("ENDLOOP".to_string()).into()),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+
         for a in &self.translated {
             if a.is_command() {
                 self.command_lines += 1;
