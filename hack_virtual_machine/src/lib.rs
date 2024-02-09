@@ -20,18 +20,26 @@ pub const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
 
 /// The stacked virtual machine
 pub struct VirtualMachine {
+    file_name: String,
     command_lines: i16,
     translated: Vec<AssemblyLine>,
 }
 
 impl VirtualMachine {
-    pub fn new() -> Self {
+    /// Create a new virtual machine for a specific `.vm` file.
+    ///
+    /// The `file_name` can be changed during compilation, must not include the `.vm` extension, and is assumed to be a valid file name.
+    pub fn new(file_name: String) -> Self {
         Self {
+            file_name,
             command_lines: 0,
             translated: Vec::new(),
         }
     }
 
+    /// Sets up stack and common calls.
+    ///
+    /// Call this immediatly after createring the VM and before running [VirtualMachine::compile]. The stack won't be there if you don't.
     pub fn init(&mut self) -> &[AssemblyLine] {
         self.translated.extend([
             AssemblyLine::Comment("Set stack pointer".to_string()),
@@ -53,6 +61,9 @@ impl VirtualMachine {
         &self.translated
     }
 
+    /// Compile a VM line into assembly.
+    ///
+    /// It is possible that no assembly will be produced by this call. Calling `pop const 42` does nothing. Future optimizers might take a VM line and not compile it until the next ones are seen. (I have no intention of going down the optimizer road).
     pub fn compile(&mut self, vm_command: &Command) -> &[AssemblyLine] {
         self.translated.clear();
         match vm_command {
@@ -96,7 +107,53 @@ impl VirtualMachine {
                 }
             }
             Command::Push(s) => match s.into() {
-                UsefulSegment::Pointer(r, i) => {}
+                UsefulSegment::Pointer(r, i) => {
+                    self.add_comment(format!("PUSH {r} {i}"));
+                    for a in memory::push_pointer(r, i) {
+                        self.translated.push(a.into())
+                    }
+                }
+                UsefulSegment::Const(c) => {
+                    self.add_comment(format!("PUSH CONST {c}"));
+                    for a in memory::push_constant(c) {
+                        self.translated.push(a.into())
+                    }
+                }
+                UsefulSegment::Static(i) => {
+                    self.add_comment(format!("PUSH STATIC {}.{i}", self.file_name));
+                    for a in memory::push_static(&self.file_name, i) {
+                        self.translated.push(a.into())
+                    }
+                }
+                UsefulSegment::Value(r) => {
+                    self.add_comment(format!("PUSH {r}"));
+                    for a in memory::push_value(r) {
+                        self.translated.push(a.into())
+                    }
+                }
+            },
+            Command::Pop(s) => match s.into() {
+                UsefulSegment::Pointer(r, i) => {
+                    self.add_comment(format!("POP {r} {i}"));
+                    for a in memory::pop_pointer(r, i) {
+                        self.translated.push(a.into())
+                    }
+                }
+                UsefulSegment::Const(c) => {
+                    self.add_comment(format!("POP CONST {c} . . . WHY?!?"));
+                }
+                UsefulSegment::Static(i) => {
+                    self.add_comment(format!("POP STATIC {}.{i}", self.file_name));
+                    for a in memory::pop_static(&self.file_name, i) {
+                        self.translated.push(a.into())
+                    }
+                }
+                UsefulSegment::Value(r) => {
+                    self.add_comment(format!("POP {r}"));
+                    for a in memory::pop_value(r) {
+                        self.translated.push(a.into())
+                    }
+                }
             },
         };
         &self.translated
@@ -138,6 +195,7 @@ impl VirtualMachine {
     }
 }
 
+/// The commands the virtual machine supports
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Add,
@@ -174,6 +232,9 @@ impl std::fmt::Display for Command {
     }
 }
 
+/// The segment of the push and pop command.
+///
+/// the `pointer` and `temp` segment only have 2 or 8 possible offsents, respecivly. Rather than doing `Segment::Temp(i16)` and checking/assuming validity, only the valid offsets can be created. [reader::Reader] causes an error if invalid offsets are encountered and everything downstream can now be happy without any assumptions.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Segment {
     Argument(i16),
@@ -220,6 +281,8 @@ impl std::fmt::Display for Segment {
 }
 
 /// VM translation produces assembly alongside very helpful comments
+///
+/// Should this be part of the [hack_assembler] crate. Sigh, probably. But it's a lot of work without any immediate benefit.
 #[derive(Debug, PartialEq, Eq)]
 pub enum AssemblyLine {
     Comment(String),
@@ -301,7 +364,7 @@ impl std::convert::From<std::io::Error> for Error {
     }
 }
 
-// Makes matching in the VM cleaner
+/// Obtained by converting from [Segment]. This enum mirrors the functions in [memory], making matching the [VirtualMachine::compile] cleaner.
 enum UsefulSegment {
     Pointer(ReservedSymbols, i16),
     Const(i16),
