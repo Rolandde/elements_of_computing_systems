@@ -41,53 +41,9 @@ impl VirtualMachine {
             AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
         ]);
 
-        // Equality assembly
-        self.translated.extend([
-            AssemblyLine::Comment("equality".to_string()),
-            Assembly::Label("EQ".to_string()).into(),
-        ]);
-        for a in arithmetic::eq() {
-            self.translated.push(a.into())
-        }
-        self.translated.extend([
-            AssemblyLine::AssemblyComment(
-                MEM_ARITH.into(),
-                "set by the VM before jump to this assembly block".to_string(),
-            ),
-            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-        ]);
-
-        // Greater than assembly
-        self.translated.extend([
-            AssemblyLine::Comment("greater than".to_string()),
-            Assembly::Label("GT".to_string()).into(),
-        ]);
-        for a in arithmetic::gt() {
-            self.translated.push(a.into())
-        }
-        self.translated.extend([
-            AssemblyLine::AssemblyComment(
-                MEM_ARITH.into(),
-                "set by the VM before jump to this assembly block".to_string(),
-            ),
-            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-        ]);
-
-        // Less than assembly
-        self.translated.extend([
-            AssemblyLine::Comment("less than".to_string()),
-            Assembly::Label("LT".to_string()).into(),
-        ]);
-        for a in arithmetic::lt() {
-            self.translated.push(a.into())
-        }
-        self.translated.extend([
-            AssemblyLine::AssemblyComment(
-                MEM_ARITH.into(),
-                "set by the VM before jump to this assembly block".to_string(),
-            ),
-            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-        ]);
+        self.init_equlity(arithmetic::eq(), "EQ".to_string());
+        self.init_equlity(arithmetic::gt(), "GT".to_string());
+        self.init_equlity(arithmetic::lt(), "LT".to_string());
 
         for a in &self.translated {
             if a.is_command() {
@@ -101,28 +57,52 @@ impl VirtualMachine {
         self.translated.clear();
         match vm_command {
             Command::Add => {
+                self.add_comment("add".to_string());
                 for a in arithmetic::add() {
                     self.translated.push(a.into())
                 }
             }
-            Command::GreaterThan => {
-                let return_address = self.command_lines + 6;
-                let gt = [
-                    AssemblyLine::Comment("calling greater than".to_string()),
-                    AssemblyLine::AssemblyComment(
-                        ACommand::Address(return_address).into(),
-                        "return address calculated by VM".to_string(),
-                    ),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
-                    AssemblyLine::Assembly(MEM_ARITH.into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
-                    AssemblyLine::Assembly(ACommand::Symbol("GT".to_string()).into()),
-                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-                ];
-            }
+            Command::Equal => self.call_equality("EQ".to_string()),
+            Command::GreaterThan => self.call_equality("GT".to_string()),
+            Command::LessThan => self.call_equality("LT".to_string()),
             _ => panic!("AHHHHHHHHHHHHHHHHHHH"),
         };
         &self.translated
+    }
+
+    fn init_equlity(&mut self, assembly: [Assembly; 24], label: String) {
+        self.translated.push(Assembly::Label(label).into());
+        for a in assembly {
+            self.translated.push(a.into())
+        }
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                MEM_ARITH.into(),
+                "set by the VM before jump to this assembly block".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+    }
+
+    fn call_equality(&mut self, symbol: String) {
+        // + 6 is how many commands there are below. Don't change command without changing this addition.
+        let return_address = self.command_lines + 6;
+        self.translated.extend([
+            AssemblyLine::Comment(format!("calling {symbol}")),
+            AssemblyLine::AssemblyComment(
+                ACommand::Address(return_address).into(),
+                "return address calculated by VM".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+            AssemblyLine::Assembly(MEM_ARITH.into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+            AssemblyLine::Assembly(ACommand::Symbol(symbol).into()),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+    }
+
+    fn add_comment(&mut self, comment: String) {
+        self.translated.push(AssemblyLine::Comment(comment));
     }
 }
 
