@@ -235,6 +235,42 @@ impl<R: std::io::BufRead> Reader<R> {
     }
 }
 
+/// Iterator over virtual machine lines.
+///
+/// # Examples
+/// ```
+/// let input = b"//My program\nadd\n\nnot";
+/// let mut coms = hack_virtual_machine::reader::CommandLines::new(&input[..]);
+/// assert_eq!(coms.next().unwrap().unwrap(), hack_virtual_machine::Command::Add);
+/// assert_eq!(coms.next().unwrap().unwrap(), hack_virtual_machine::Command::BitNot);
+/// assert!(coms.next().is_none())
+/// ```
+pub struct CommandLines<R> {
+    inner: Reader<R>,
+}
+
+impl<R: std::io::BufRead> CommandLines<R> {
+    pub fn new(buffer: R) -> Self {
+        Self {
+            inner: Reader::new(buffer),
+        }
+    }
+}
+
+impl<R: std::io::BufRead> std::iter::Iterator for CommandLines<R> {
+    type Item = Result<Command, Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.inner.read_command() {
+            Err(e) => Some(Err(e)),
+            Ok(0) => None,
+            Ok(_) => match self.inner.parse_command() {
+                Err(e) => Some(Err(e)),
+                Ok(c) => Some(Ok(c)),
+            },
+        }
+    }
+}
+
 /// Remove leading and trailing whitespace and any comment characters. May leave an empty string.
 ///
 /// Comment characters are those following `"//"` (including itself).
