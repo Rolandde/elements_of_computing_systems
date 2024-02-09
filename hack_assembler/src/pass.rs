@@ -40,6 +40,11 @@ impl SymbolTable {
     pub fn insert(&mut self, k: String, v: hack_interface::Bit15) -> Option<hack_interface::Bit15> {
         self.inner.insert(k, v)
     }
+
+    /// Is the symbol table empty
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 }
 
 /// Go through assembly and generate a [SymbolTable] that holds the labels.
@@ -161,12 +166,18 @@ impl FirstPass {
     fn pass_label(&mut self, label: String) -> Result<(), hack_interface::Error> {
         if ReservedSymbols::is_reserved(&label) {
             Err(hack_interface::Error::SymbolTable(self.line_count))
-        } else if self.inner.contains_key(&label) {
-            Err(hack_interface::Error::SymbolTable(self.line_count))
-        } else {
-            self.inner.insert(label, self.command_count.into());
+        } else if let std::collections::hash_map::Entry::Vacant(e) = self.inner.entry(label) {
+            e.insert(self.command_count.into());
             Ok(())
+        } else {
+            Err(hack_interface::Error::SymbolTable(self.line_count))
         }
+    }
+}
+
+impl Default for FirstPass {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -184,7 +195,7 @@ where
 {
     pub fn new(iter: I, symbol_table: SymbolTable) -> Self {
         Self {
-            iter: iter,
+            iter,
             assembler: Assembler::new(symbol_table),
         }
     }

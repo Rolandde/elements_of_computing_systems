@@ -105,7 +105,7 @@ impl Assembler {
         match a {
             ACommand::Address(b) => (*b).into(),
             ACommand::Reserved(r) => (*r).into(),
-            ACommand::Symbol(s) => match self.symbol_table.get(&s) {
+            ACommand::Symbol(s) => match self.symbol_table.get(s) {
                 Some(b) => hack_interface::Bit16::from(b),
                 None => {
                     let current_address = self.variable_symbol_count.into();

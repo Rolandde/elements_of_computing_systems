@@ -227,12 +227,12 @@ impl<'a> Debugger<'a> {
 pub struct Scan<'a> {
     computer: &'a hack_kernel::Computer,
     current_address: i16,
-    current_memory: std::vec::IntoIter<bool>,
+    current_memory: std::array::IntoIter<bool, 16>,
 }
 
 impl<'a> Scan<'a> {
     pub fn new(computer: &'a hack_kernel::Computer) -> Self {
-        let screen = computer.screen(Self::to_13bit(0)).to_vec();
+        let screen = computer.screen(Self::to_13bit(0));
         Self {
             computer,
             current_address: 0,
@@ -261,7 +261,6 @@ impl<'a> std::iter::Iterator for Scan<'a> {
                     self.current_memory = self
                         .computer
                         .screen(Self::to_13bit(self.current_address))
-                        .to_vec()
                         .into_iter();
                     self.current_memory.next()
                 } else {
@@ -309,6 +308,12 @@ impl RomWriter {
     /// Take out the ROM from the writer, destorying it, and load it into the computer.
     pub fn create_load_rom(self) -> hack_kernel::Computer {
         hack_kernel::Computer::new(self.create_rom())
+    }
+}
+
+impl Default for RomWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

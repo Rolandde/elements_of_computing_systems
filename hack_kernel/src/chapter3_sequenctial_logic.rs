@@ -715,3 +715,9 @@ impl Counter {
         self.count.cycle(new, true)
     }
 }
+
+impl Default for Counter {
+    fn default() -> Self {
+        Self::new()
+    }
+}

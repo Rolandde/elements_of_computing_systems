@@ -32,7 +32,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         debug.computer().cycle(false);
 
-        for (pos, pixel) in hack_interface::Scan::new(&debug.computer()).enumerate() {
+        for (pos, pixel) in hack_interface::Scan::new(debug.computer()).enumerate() {
             if pixel {
                 buffer[pos] = 0
             } else {

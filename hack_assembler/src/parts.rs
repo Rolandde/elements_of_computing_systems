@@ -32,10 +32,7 @@ pub enum ReservedSymbols {
 
 impl ReservedSymbols {
     pub fn is_reserved(symbol: &str) -> bool {
-        match Self::try_from(symbol) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        Self::try_from(symbol).is_ok()
     }
 }
 
@@ -223,7 +220,7 @@ impl std::str::FromStr for CCommand {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (destination_str, rest) = match s.split_once("=") {
+        let (destination_str, rest) = match s.split_once('=') {
             Some((d, r)) => (Some(d), r),
             None => (None, s),
         };
@@ -233,7 +230,7 @@ impl std::str::FromStr for CCommand {
             None => CDest::Null,
         };
 
-        let (command_str, jump_str) = match rest.split_once(";") {
+        let (command_str, jump_str) = match rest.split_once(';') {
             Some((c, j)) => (c, Some(j)),
             None => (rest, None),
         };

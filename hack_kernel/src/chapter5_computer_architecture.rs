@@ -160,6 +160,12 @@ impl CPU {
     }
 }
 
+impl Default for CPU {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The gamer Rom32K
 ///
 /// This gate is read only, so once initialized there is no way to modify it. [Rom32KWriter] is used to create a ROM.
@@ -198,6 +204,12 @@ impl Rom32KWriter {
 
     pub fn create_rom(self) -> Rom32K {
         Rom32K { state: self.state }
+    }
+}
+
+impl Default for Rom32KWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

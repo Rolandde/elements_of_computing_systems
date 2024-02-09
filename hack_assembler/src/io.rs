@@ -24,12 +24,11 @@ pub struct Reader<R> {
 impl<R: std::io::BufRead> Reader<R> {
     /// Reader starts at the first line of the file
     pub fn new(inner: R) -> Self {
-        let reader = Self {
+        Self {
             inner,
             buffer: None,
             line: 0,
-        };
-        reader
+        }
     }
 
     /// Read the next line into the buffer and [cleans][clean_line] it. Returns true if line was read and false if EOF was reached.
@@ -160,10 +159,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// ```
     pub fn is_a_command(&self) -> Option<bool> {
-        match &self.buffer {
-            None => None,
-            Some(s) => Some(s.starts_with("@")),
-        }
+        self.buffer.as_ref().map(|s| s.starts_with('@'))
     }
     /// Is the current line an C command (contains `'='` or `';'`)?
     ///
@@ -183,10 +179,9 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// ```
     pub fn is_c_command(&self) -> Option<bool> {
-        match &self.buffer {
-            None => None,
-            Some(s) => Some(s.find(|c| c == ';' || c == '=').is_some()),
-        }
+        self.buffer
+            .as_ref()
+            .map(|s| s.find(|c| c == ';' || c == '=').is_some())
     }
 
     /// Has anything been read into the buffer?
@@ -205,7 +200,7 @@ impl<R: std::io::BufRead> Reader<R> {
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
     pub fn is_empty_buffer(&self) -> bool {
-        return self.buffer.is_none();
+        self.buffer.is_none()
     }
 
     /// Is the current line empty?
@@ -222,10 +217,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// ```
     pub fn is_empty_line(&self) -> Option<bool> {
-        match &self.buffer {
-            None => None,
-            Some(s) => Some(s.len() == 0),
-        }
+        self.buffer.as_ref().map(|s| s.is_empty())
     }
 
     /// Is the current line a label symbol (starts with `'('`)?
@@ -246,10 +238,7 @@ impl<R: std::io::BufRead> Reader<R> {
     ///
     /// ```
     pub fn is_label(&self) -> Option<bool> {
-        match &self.buffer {
-            None => None,
-            Some(s) => Some(s.starts_with("(")),
-        }
+        self.buffer.as_ref().map(|s| s.starts_with('('))
     }
 
     /// Parses the label on the current line.
@@ -278,11 +267,9 @@ impl<R: std::io::BufRead> Reader<R> {
                 .nth(0)
                 .ok_or(hack_interface::Error::AssemblyLabel(self.line))?
                 .is_numeric()
-            {
-                Err(hack_interface::Error::AssemblyLabel(self.line))
-            } else if !s
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '$' || c == ':')
+                || !s
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '$' || c == ':')
             {
                 Err(hack_interface::Error::AssemblyLabel(self.line))
             } else {
