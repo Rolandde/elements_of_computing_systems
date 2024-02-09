@@ -57,15 +57,47 @@ impl VirtualMachine {
         self.translated.clear();
         match vm_command {
             Command::Add => {
-                self.add_comment("add".to_string());
+                self.add_comment("ADD".to_string());
                 for a in arithmetic::add() {
+                    self.translated.push(a.into())
+                }
+            }
+            Command::Subtract => {
+                self.add_comment("SUB".to_string());
+                for a in arithmetic::sub() {
+                    self.translated.push(a.into())
+                }
+            }
+            Command::Negative => {
+                self.add_comment("NEG".to_string());
+                for a in arithmetic::neg() {
                     self.translated.push(a.into())
                 }
             }
             Command::Equal => self.call_equality("EQ".to_string()),
             Command::GreaterThan => self.call_equality("GT".to_string()),
             Command::LessThan => self.call_equality("LT".to_string()),
-            _ => panic!("AHHHHHHHHHHHHHHHHHHH"),
+            Command::BitAnd => {
+                self.add_comment("AND".to_string());
+                for a in arithmetic::and() {
+                    self.translated.push(a.into())
+                }
+            }
+            Command::BitOr => {
+                self.add_comment("OR".to_string());
+                for a in arithmetic::or() {
+                    self.translated.push(a.into())
+                }
+            }
+            Command::BitNot => {
+                self.add_comment("NOT".to_string());
+                for a in arithmetic::not() {
+                    self.translated.push(a.into())
+                }
+            }
+            Command::Push(s) => match s.into() {
+                UsefulSegment::Pointer(r, i) => {}
+            },
         };
         &self.translated
     }
@@ -266,6 +298,37 @@ impl std::error::Error for Error {
 impl std::convert::From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Self::Io(e)
+    }
+}
+
+// Makes matching in the VM cleaner
+enum UsefulSegment {
+    Pointer(ReservedSymbols, i16),
+    Const(i16),
+    Static(i16),
+    Value(ReservedSymbols),
+}
+
+impl std::convert::From<&Segment> for UsefulSegment {
+    fn from(value: &Segment) -> Self {
+        match value {
+            Segment::Argument(i) => Self::Pointer(ReservedSymbols::ARG, *i),
+            Segment::Local(i) => Self::Pointer(ReservedSymbols::LCL, *i),
+            Segment::Static(i) => Self::Static(*i),
+            Segment::Constant(i) => Self::Const(*i),
+            Segment::This(i) => Self::Pointer(ReservedSymbols::THIS, *i),
+            Segment::That(i) => Self::Pointer(ReservedSymbols::THAT, *i),
+            Segment::PointerThis => Self::Value(ReservedSymbols::R3),
+            Segment::PointerThat => Self::Value(ReservedSymbols::R4),
+            Segment::Temp0 => Self::Value(ReservedSymbols::R5),
+            Segment::Temp1 => Self::Value(ReservedSymbols::R6),
+            Segment::Temp2 => Self::Value(ReservedSymbols::R7),
+            Segment::Temp3 => Self::Value(ReservedSymbols::R8),
+            Segment::Temp4 => Self::Value(ReservedSymbols::R9),
+            Segment::Temp5 => Self::Value(ReservedSymbols::R10),
+            Segment::Temp6 => Self::Value(ReservedSymbols::R11),
+            Segment::Temp7 => Self::Value(ReservedSymbols::R12),
+        }
     }
 }
 
