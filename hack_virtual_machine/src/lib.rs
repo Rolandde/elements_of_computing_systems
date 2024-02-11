@@ -6,8 +6,6 @@
 //! # Wherefore impl Trait
 //! [VirtualMachine] dumps assembly into a container that implements `extend`. I originally had that as a `Vec`. This makes sense for dumping all assembly lines into memory. But then I wanted to have an iterator that gets vm commands in chunks and throws out assembly in chunks. That means I need to pop out elements from the front of the collection. `VedDeque` does that nice. So now I have a impl Trait.
 
-use std::fs::read;
-
 use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
 use hack_assembler::Assembly;
 
@@ -173,10 +171,15 @@ impl VirtualMachine {
         assembly.extend(self.translated.drain(..));
     }
 
-    /// Writes out any remaining assembly code.
+    /// Call after the last command has been compiled to flush out any remaining assembly lines.
     ///
-    /// This must be called before assembly. If optimization was implemented (and it's not), command might have been cached that will be compiled here. For now, this adds an infiniate loop at the end of the program.
-    pub fn finish(mut self, assembly: &mut impl std::iter::Extend<AssemblyLine>) {
+    /// In case the virtual machine has buffered lines for optimization. As there is none (and I don't plan to do any), this does nothing, but good to code in the assumption in case I suddenly change my mind.
+    pub fn flush(&mut self, _assembly: &mut impl std::iter::Extend<AssemblyLine>) {}
+
+    /// Add an infinate loop.
+    ///
+    /// Good practice to add one at the end of assembly to prevent the counter from going of the edge and looping back.
+    pub fn infinate_loop(&mut self, assembly: &mut impl std::iter::Extend<AssemblyLine>) {
         self.add_comment("Infinite loop at end of program".into());
         self.translated.extend([
             AssemblyLine::Assembly(ACommand::Symbol("ENDLOOP".to_string()).into()),
@@ -236,22 +239,74 @@ impl VirtualMachine {
     }
 }
 
-pub struct VMBuffered<R> {
-    reader: reader::Reader<R>,
-    vm: VirtualMachine,
+pub struct VMBufferedIter<'a, R> {
+    reader: reader::CommandLines<R>,
+    vm: &'a mut VirtualMachine,
     compiled: std::collections::VecDeque<AssemblyLine>,
+    spot: FileSpot,
+    // Can't think of a way to implicitly check if the vm has written the infinate loop once the last file has been compiled
+    inf_loop_written: bool,
 }
 
-impl<R: std::io::BufRead> VMBuffered<R> {
-    pub fn new(buffer: R, buffer_name: String) -> Self {
-        let mut vm = VirtualMachine::new(buffer_name);
+impl<'a, R: std::io::BufRead> VMBufferedIter<'a, R> {
+    fn new(buffer: R, vm: &'a mut VirtualMachine, spot: FileSpot) -> Self {
         let mut compiled = std::collections::VecDeque::new();
-        vm.init(&mut compiled);
+        if spot == FileSpot::First || spot == FileSpot::FirstLast {
+            vm.init(&mut compiled);
+        }
 
         Self {
-            reader: reader::Reader::new(buffer),
+            reader: reader::CommandLines::new(buffer),
             vm,
             compiled,
+            spot,
+            inf_loop_written: false,
+        }
+    }
+}
+
+impl<'a, R: std::io::BufRead> std::iter::Iterator for VMBufferedIter<'a, R> {
+    type Item = Result<AssemblyLine, Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.compiled.pop_front() {
+            Some(a) => return Some(Ok(a)),
+            None => {}
+        };
+
+        if self.inf_loop_written {
+            return None;
+        }
+
+        // Sigh to the loop, but I can't think of a cleaner way
+        // It's necessary because a vm command is not guaranteed to produce assembly code, so have to keep reading until it does/reach end of last file/go to next file
+        loop {
+            match self.reader.next() {
+                // This file is done
+                None => {
+                    // and it's the last file
+                    if self.spot == FileSpot::Last || self.spot == FileSpot::FirstLast {
+                        self.inf_loop_written = true;
+                        self.vm.flush(&mut self.compiled);
+                        self.vm.infinate_loop(&mut self.compiled);
+                        return Some(Ok(self.compiled.pop_front().unwrap()));
+                    } else {
+                        return None;
+                    }
+                }
+                Some(line) => match line {
+                    Err(e) => return Some(Err(e)),
+                    Ok(c) => {
+                        self.vm.compile(&c, &mut self.compiled);
+                        // The vm does not guarantee assembly code for each command
+                        match self.compiled.pop_front() {
+                            // assembly was produces, so pass it on
+                            Some(a) => return Some(Ok(a)),
+                            // no assembly, go another loop
+                            None => {}
+                        }
+                    }
+                },
+            };
         }
     }
 }
@@ -454,6 +509,16 @@ impl std::convert::From<&Segment> for UsefulSegment {
             Segment::Temp7 => Self::Value(ReservedSymbols::R12),
         }
     }
+}
+
+/// Which spot is the file during compilation.
+///
+/// The first file gets all the VM setup assembly, the last file gets a VM flush, and first and last means there is only one file.
+#[derive(Debug, PartialEq, Eq)]
+enum FileSpot {
+    First,
+    Last,
+    FirstLast,
 }
 
 pub mod arithmetic;
