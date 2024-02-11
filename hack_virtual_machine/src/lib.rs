@@ -6,6 +6,8 @@
 //! # Wherefore impl Trait
 //! [VirtualMachine] dumps assembly into a container that implements `extend`. I originally had that as a `Vec`. This makes sense for dumping all assembly lines into memory. But then I wanted to have an iterator that gets vm commands in chunks and throws out assembly in chunks. That means I need to pop out elements from the front of the collection. `VedDeque` does that nice. So now I have a impl Trait.
 
+use std::fs::read;
+
 use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
 use hack_assembler::Assembly;
 
@@ -191,6 +193,13 @@ impl VirtualMachine {
         assembly.extend(self.translated.drain(..));
     }
 
+    /// The virtual machine is now getting commands from a new file.
+    ///
+    /// The file name provides scope for labels in the assembly code.
+    pub fn update_file_name(&mut self, new_name: String) {
+        self.file_name = new_name;
+    }
+
     fn init_equlity(&mut self, assembly: [Assembly; 24], label: String) {
         self.translated.push(Assembly::Label(label).into());
         for a in assembly {
@@ -224,6 +233,26 @@ impl VirtualMachine {
 
     fn add_comment(&mut self, comment: String) {
         self.translated.push(AssemblyLine::Comment(comment));
+    }
+}
+
+pub struct VMBuffered<R> {
+    reader: reader::Reader<R>,
+    vm: VirtualMachine,
+    compiled: std::collections::VecDeque<AssemblyLine>,
+}
+
+impl<R: std::io::BufRead> VMBuffered<R> {
+    pub fn new(buffer: R, buffer_name: String) -> Self {
+        let mut vm = VirtualMachine::new(buffer_name);
+        let mut compiled = std::collections::VecDeque::new();
+        vm.init(&mut compiled);
+
+        Self {
+            reader: reader::Reader::new(buffer),
+            vm,
+            compiled,
+        }
     }
 }
 
