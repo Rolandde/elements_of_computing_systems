@@ -239,78 +239,6 @@ impl VirtualMachine {
     }
 }
 
-pub struct VMBufferedIter<'a, R> {
-    reader: reader::CommandLines<R>,
-    vm: &'a mut VirtualMachine,
-    compiled: std::collections::VecDeque<AssemblyLine>,
-    spot: FileSpot,
-    // Can't think of a way to implicitly check if the vm has written the infinate loop once the last file has been compiled
-    inf_loop_written: bool,
-}
-
-impl<'a, R: std::io::BufRead> VMBufferedIter<'a, R> {
-    fn new(buffer: R, vm: &'a mut VirtualMachine, spot: FileSpot) -> Self {
-        let mut compiled = std::collections::VecDeque::new();
-        if spot == FileSpot::First || spot == FileSpot::FirstLast {
-            vm.init(&mut compiled);
-        }
-
-        Self {
-            reader: reader::CommandLines::new(buffer),
-            vm,
-            compiled,
-            spot,
-            inf_loop_written: false,
-        }
-    }
-}
-
-impl<'a, R: std::io::BufRead> std::iter::Iterator for VMBufferedIter<'a, R> {
-    type Item = Result<AssemblyLine, Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.compiled.pop_front() {
-            Some(a) => return Some(Ok(a)),
-            None => {}
-        };
-
-        if self.inf_loop_written {
-            return None;
-        }
-
-        // Sigh to the loop, but I can't think of a cleaner way
-        // It's necessary because a vm command is not guaranteed to produce assembly code, so have to keep reading until it does/reach end of last file/go to next file
-        loop {
-            match self.reader.next() {
-                // This file is done
-                None => {
-                    // and it's the last file
-                    if self.spot == FileSpot::Last || self.spot == FileSpot::FirstLast {
-                        self.inf_loop_written = true;
-                        self.vm.flush(&mut self.compiled);
-                        self.vm.infinate_loop(&mut self.compiled);
-                        return Some(Ok(self.compiled.pop_front().unwrap()));
-                    } else {
-                        return None;
-                    }
-                }
-                Some(line) => match line {
-                    Err(e) => return Some(Err(e)),
-                    Ok(c) => {
-                        self.vm.compile(&c, &mut self.compiled);
-                        // The vm does not guarantee assembly code for each command
-                        match self.compiled.pop_front() {
-                            // assembly was produces, so pass it on
-                            Some(a) => return Some(Ok(a)),
-                            // no assembly, go another loop
-                            None => {}
-                        }
-                    }
-                },
-            };
-        }
-    }
-}
-
 /// The commands the virtual machine supports
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -509,16 +437,6 @@ impl std::convert::From<&Segment> for UsefulSegment {
             Segment::Temp7 => Self::Value(ReservedSymbols::R12),
         }
     }
-}
-
-/// Which spot is the file during compilation.
-///
-/// The first file gets all the VM setup assembly, the last file gets a VM flush, and first and last means there is only one file.
-#[derive(Debug, PartialEq, Eq)]
-enum FileSpot {
-    First,
-    Last,
-    FirstLast,
 }
 
 pub mod arithmetic;
