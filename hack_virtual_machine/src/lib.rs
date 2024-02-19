@@ -50,11 +50,16 @@ impl VirtualMachine {
             AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
             AssemblyLine::Assembly(ReservedSymbols::SP.into()),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+            AssemblyLine::Assembly(ACommand::Symbol("START".to_string()).into()), // Starting a program requires function calls, which are for the next chapter
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
 
         self.init_equlity(arithmetic::eq(), "EQ".to_string());
         self.init_equlity(arithmetic::gt(), "GT".to_string());
         self.init_equlity(arithmetic::lt(), "LT".to_string());
+
+        self.translated // This can be removed once function calls are implemented and the root function is called
+            .push(AssemblyLine::Assembly(Assembly::Label("START".to_string())).into());
 
         for a in &self.translated {
             if a.is_command() {
@@ -182,7 +187,7 @@ impl VirtualMachine {
     pub fn infinate_loop(&mut self, assembly: &mut impl std::iter::Extend<AssemblyLine>) {
         self.add_comment("Infinite loop at end of program".into());
         self.translated.extend([
-            AssemblyLine::Assembly(ACommand::Symbol("ENDLOOP".to_string()).into()),
+            AssemblyLine::Assembly(Assembly::Label("ENDLOOP".to_string()).into()),
             AssemblyLine::Assembly(ACommand::Symbol("ENDLOOP".to_string()).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
@@ -211,8 +216,9 @@ impl VirtualMachine {
         self.translated.extend([
             AssemblyLine::AssemblyComment(
                 MEM_ARITH.into(),
-                "set by the VM before jump to this assembly block".to_string(),
+                "return address set by VM before equality call".to_string(),
             ),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
     }
@@ -442,3 +448,129 @@ impl std::convert::From<&Segment> for UsefulSegment {
 pub mod arithmetic;
 pub mod memory;
 pub mod reader;
+
+#[cfg(test)]
+mod book_tests {
+    use super::*;
+
+    const SIMPLE_ADD: &'static str = "// Pushes and adds two constants.
+push constant 7
+push constant 8
+add";
+
+    const STACK_TEST: &'static str = "// Executes a sequence of arithmetic and logical operations
+// on the stack. 
+push constant 17
+push constant 17
+eq
+push constant 17
+push constant 16
+eq
+push constant 16
+push constant 17
+eq
+push constant 892
+push constant 891
+lt
+push constant 891
+push constant 892
+lt
+push constant 891
+push constant 891
+lt
+push constant 32767
+push constant 32766
+gt
+push constant 32766
+push constant 32767
+gt
+push constant 32766
+push constant 32766
+gt
+push constant 57
+push constant 31
+push constant 53
+add
+push constant 112
+sub
+neg
+and
+push constant 82
+or
+not";
+
+    fn compile(vm_lines: &str) -> Vec<Assembly> {
+        let mut al = Vec::new();
+        let mut vm = VirtualMachine::new("file".to_string());
+        vm.init(&mut al);
+        for c in reader::CommandLines::new(vm_lines.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+        vm.flush(&mut al);
+        vm.infinate_loop(&mut al);
+
+        let mut ass = Vec::new();
+        for l in al {
+            match l {
+                AssemblyLine::Assembly(a) => ass.push(a),
+                AssemblyLine::AssemblyComment(a, _) => ass.push(a),
+                AssemblyLine::Comment(_) => {}
+            }
+        }
+
+        ass
+    }
+
+    #[test]
+    fn test_simple_add() {
+        let ass = compile(SIMPLE_ADD);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 60 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 257.into());
+        assert_eq!(d.read_memory(256.into()), 15.into());
+    }
+
+    #[test]
+    fn test_stack() {
+        let ass = compile(STACK_TEST);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 1000 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 266.into());
+        assert_eq!(d.read_memory(256.into()), (-1).into());
+        assert_eq!(d.read_memory(257.into()), 0.into());
+        assert_eq!(d.read_memory(258.into()), 0.into());
+        assert_eq!(d.read_memory(259.into()), 0.into());
+        assert_eq!(d.read_memory(260.into()), (-1).into());
+        assert_eq!(d.read_memory(261.into()), 0.into());
+        assert_eq!(d.read_memory(262.into()), (-1).into());
+        assert_eq!(d.read_memory(263.into()), 0.into());
+        assert_eq!(d.read_memory(264.into()), 0.into());
+        assert_eq!(d.read_memory(265.into()), (-91).into());
+    }
+}

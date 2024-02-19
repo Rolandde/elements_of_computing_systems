@@ -324,6 +324,7 @@ mod vm_arithmetic_tests {
         stack_test(&and(), 3, 0, Some(0), vec![MemVal(1, 0), MemVal(0, 2)]);
         stack_test(&and(), 3, -1, Some(0), vec![MemVal(1, 0), MemVal(0, 2)]);
         stack_test(&and(), 3, -1, Some(-1), vec![MemVal(1, -1), MemVal(0, 2)]);
+        stack_test(&and(), 3, 57, Some(28), vec![MemVal(1, 24), MemVal(0, 2)]);
     }
 
     #[test]

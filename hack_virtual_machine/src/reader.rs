@@ -164,7 +164,7 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "and" => {
                 self.assert_args(1)?;
-                Ok(Command::Add)
+                Ok(Command::BitAnd)
             }
             "or" => {
                 self.assert_args(1)?;
