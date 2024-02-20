@@ -499,7 +499,7 @@ push constant 82
 or
 not";
 
-    const MEMORY_TEST: &'static str =
+    const SEGMENT_TEST: &'static str =
         "// Executes pop and push commands using the virtual memory segments.
 push constant 10
 pop local 0
@@ -682,5 +682,39 @@ add";
         assert_eq!(d.read_memory(17.into()), 333.into());
         assert_eq!(d.read_memory(18.into()), 111.into());
         assert_eq!(d.read_memory(256.into()), 1110.into());
+    }
+
+    #[test]
+    fn test_segment() {
+        let ass = compile(SEGMENT_TEST);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        // No initialization of segments pointers by VM after Chapter 7. The values are from the BasicTest.tst file
+        d.write_memory(1.into(), 300.into());
+        d.write_memory(2.into(), 400.into());
+        d.write_memory(3.into(), 3000.into());
+        d.write_memory(4.into(), 3010.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 600 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 257.into());
+        assert_eq!(d.read_memory(256.into()), 472.into());
+        assert_eq!(d.read_memory(300.into()), 10.into());
+        assert_eq!(d.read_memory(401.into()), 21.into());
+        assert_eq!(d.read_memory(402.into()), 22.into());
+        assert_eq!(d.read_memory(3006.into()), 36.into());
+        assert_eq!(d.read_memory(3012.into()), 42.into());
+        assert_eq!(d.read_memory(3015.into()), 45.into());
+        assert_eq!(d.read_memory(11.into()), 510.into());
     }
 }
