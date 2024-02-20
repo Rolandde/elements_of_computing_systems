@@ -499,6 +499,65 @@ push constant 82
 or
 not";
 
+    const MEMORY_TEST: &'static str =
+        "// Executes pop and push commands using the virtual memory segments.
+push constant 10
+pop local 0
+push constant 21
+push constant 22
+pop argument 2
+pop argument 1
+push constant 36
+pop this 6
+push constant 42
+push constant 45
+pop that 5
+pop that 2
+push constant 510
+pop temp 6
+push local 0
+push that 5
+add
+push argument 1
+sub
+push this 6
+push this 6
+add
+sub
+push temp 6
+add";
+
+    const POINTER_TEST: &'static str = "// Executes pop and push commands using the 
+// pointer, this, and that segments.
+push constant 3030
+pop pointer 0
+push constant 3040
+pop pointer 1
+push constant 32
+pop this 2
+push constant 46
+pop that 6
+push pointer 0
+push pointer 1
+add
+push this 2
+sub
+push that 6
+add";
+
+    const STATIC_TEST: &'static str = "// Executes pop and push commands using the static segment.
+push constant 111
+push constant 333
+push constant 888
+pop static 8
+pop static 3
+pop static 1
+push static 3
+push static 1
+sub
+push static 8
+add";
+
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
         let mut vm = VirtualMachine::new("file".to_string());
@@ -572,5 +631,56 @@ not";
         assert_eq!(d.read_memory(263.into()), 0.into());
         assert_eq!(d.read_memory(264.into()), 0.into());
         assert_eq!(d.read_memory(265.into()), (-91).into());
+    }
+
+    #[test]
+    fn test_pointer() {
+        let ass = compile(POINTER_TEST);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 450 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 257.into());
+        assert_eq!(d.read_memory(256.into()), 6084.into());
+        assert_eq!(d.read_memory(3.into()), 3030.into());
+        assert_eq!(d.read_memory(4.into()), 3040.into());
+        assert_eq!(d.read_memory(3032.into()), 32.into());
+        assert_eq!(d.read_memory(3046.into()), 46.into());
+    }
+
+    #[test]
+    fn test_static() {
+        let ass = compile(STATIC_TEST);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 200 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 257.into());
+        assert_eq!(d.read_memory(16.into()), 888.into());
+        assert_eq!(d.read_memory(17.into()), 333.into());
+        assert_eq!(d.read_memory(18.into()), 111.into());
+        assert_eq!(d.read_memory(256.into()), 1110.into());
     }
 }
