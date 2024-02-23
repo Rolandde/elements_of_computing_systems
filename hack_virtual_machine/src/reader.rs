@@ -180,6 +180,26 @@ impl<R: std::io::BufRead> Reader<R> {
                 self.assert_args(2)?;
                 Ok(Command::Label(self.check_label_func()?))
             }
+            "goto" => {
+                self.assert_args(2)?;
+                Ok(Command::Goto(self.check_label_func()?))
+            }
+            "if-goto" => {
+                self.assert_args(2)?;
+                Ok(Command::GotoIf(self.check_label_func()?))
+            }
+            "function" => {
+                self.assert_args(3)?;
+                Ok(Command::Function(self.check_label_func()?, self.arg3))
+            }
+            "call" => {
+                self.assert_args(3)?;
+                Ok(Command::Call(self.check_label_func()?, self.arg3))
+            }
+            "return" => {
+                self.assert_args(1)?;
+                Ok(Command::Return)
+            }
             _ => Err(Error::UnknownCommand(self.line)),
         }
     }

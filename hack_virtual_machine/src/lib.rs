@@ -26,6 +26,8 @@ pub struct VirtualMachine {
     file_name: String,
     command_lines: i16,
     translated: Vec<AssemblyLine>,
+    func: Option<String>, // What function is the VM currently going through
+    call_count: usize, // How many call have been made within the function (resets between functions)
 }
 
 impl VirtualMachine {
@@ -37,6 +39,8 @@ impl VirtualMachine {
             file_name,
             command_lines: 0,
             translated: Vec::new(),
+            func: None,
+            call_count: 0,
         }
     }
 
@@ -391,12 +395,12 @@ pub enum Error {
     InvalidLabelFunc(usize),
     /// Upstream IO error.
     Io(std::io::Error),
+    /// Segment index is out of bounds
+    OutOfBoundsIndex(usize),
     /// The command is not part of the VM spec
     UnknownCommand(usize),
     /// The segement is not part of the VM spec
     UnknownSegment(usize),
-    /// Segment index is out of bounds
-    OutOfBoundsIndex(usize),
 }
 
 impl std::fmt::Display for Error {
