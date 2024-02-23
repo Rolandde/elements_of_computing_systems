@@ -387,6 +387,8 @@ impl std::convert::From<Assembly> for AssemblyLine {
 pub enum Error {
     /// The command has too few, too many, or wrong type of arguments
     InvalidArgs(usize),
+    /// Label or function name is invalid (does not begin with number, and is alphanumberic, _, ., and :)
+    InvalidLabelFunc(usize),
     /// Upstream IO error.
     Io(std::io::Error),
     /// The command is not part of the VM spec
@@ -403,6 +405,9 @@ impl std::fmt::Display for Error {
             Self::InvalidArgs(line) => {
                 write!(f, "wrong arg number or type on line {}", line)
             }
+            Self::InvalidLabelFunc(line) => {
+                write!(f, "invalid label or function name on line {}", line)
+            }
             Self::Io(e) => write!(f, "cannot read: {}", e),
             Self::UnknownCommand(line) => write!(f, "unknown command on line {}", line),
             Self::UnknownSegment(line) => write!(f, "unknown segment on line {}", line),
@@ -415,6 +420,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::InvalidArgs(_) => None,
+            Self::InvalidLabelFunc(_) => None,
             Self::Io(e) => Some(e),
             Self::UnknownCommand(_) => None,
             Self::UnknownSegment(_) => None,

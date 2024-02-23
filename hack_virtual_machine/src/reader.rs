@@ -176,6 +176,10 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "push" => Ok(Command::Push(self.parse_segment()?)),
             "pop" => Ok(Command::Pop(self.parse_segment()?)),
+            "label" => {
+                self.assert_args(2)?;
+                Ok(Command::Label(self.check_label_func()?))
+            }
             _ => Err(Error::UnknownCommand(self.line)),
         }
     }
@@ -185,6 +189,27 @@ impl<R: std::io::BufRead> Reader<R> {
             Err(Error::InvalidArgs(self.line))
         } else {
             Ok(())
+        }
+    }
+
+    /// Checks the label of function name and returns a copy of it.
+    ///
+    /// This assumes that a goto, if-goto, function, or call is in the buffer.
+    fn check_label_func(&self) -> Result<String, Error> {
+        if self
+            .arg2
+            .chars()
+            .nth(0)
+            .ok_or(Error::InvalidLabelFunc(self.line))?
+            .is_numeric()
+            || !self
+                .arg2
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == ':')
+        {
+            Err(Error::InvalidLabelFunc(self.line))
+        } else {
+            Ok(self.arg2.clone())
         }
     }
 
@@ -360,6 +385,17 @@ mod vm_parser_tests {
         );
         reader.read_command()?;
         assert_eq!(reader.parse_command()?, Command::Pop(crate::Segment::Temp4));
+        Ok(())
+    }
+
+    #[test]
+    fn test_label() -> Result<(), Error> {
+        let input = b"label valid\nlabel inva$lid";
+        let mut reader = Reader::new(&input[..]);
+        reader.read_command()?;
+        assert_eq!(reader.parse_command()?, Command::Label("valid".to_string()));
+        reader.read_command()?;
+        assert!(reader.parse_command().is_err());
         Ok(())
     }
 }
