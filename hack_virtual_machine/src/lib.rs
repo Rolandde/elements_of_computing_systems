@@ -170,9 +170,30 @@ impl VirtualMachine {
                     }
                 }
             },
-            Command::Goto(_) => panic!("no goto support"),
-            Command::GotoIf(_) => panic!("no if-goto support"),
-            Command::Label(_) => panic!("no label support"),
+            Command::Goto(l) => {
+                self.add_comment(format!("GOTO {l}"));
+                self.translated.extend([
+                    AssemblyLine::Assembly(ACommand::Symbol(self.generate_label(l)).into()),
+                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+                ])
+            }
+            Command::GotoIf(l) => {
+                self.add_comment(format!("IF-GOTO {l}"));
+                self.translated.extend([
+                    AssemblyLine::Assembly(ACommand::Reserved(ReservedSymbols::SP).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::MMinusOne).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::M).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol(self.generate_label(l)).into()),
+                    AssemblyLine::Assembly(CCommand::new_jump(CComp::D, CJump::NotEqual).into()),
+                ])
+            }
+            Command::Label(l) => {
+                self.add_comment(format!("LABEL {l}"));
+                self.translated.push(AssemblyLine::Assembly(Assembly::Label(
+                    self.generate_label(l),
+                )))
+            }
             Command::Function(_, _) => panic!("no function support"),
             Command::Call(_, _) => panic!("no call support"),
             Command::Return => panic!("no return suppport"),
@@ -252,6 +273,13 @@ impl VirtualMachine {
 
     fn add_comment(&mut self, comment: String) {
         self.translated.push(AssemblyLine::Comment(comment));
+    }
+
+    fn generate_label(&self, label: &str) -> String {
+        match &self.func {
+            None => format!("{}${label}", self.file_name),
+            Some(s) => format!("{}.{s}${label}", self.file_name),
+        }
     }
 }
 
