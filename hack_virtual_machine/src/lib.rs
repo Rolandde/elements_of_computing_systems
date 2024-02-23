@@ -166,6 +166,12 @@ impl VirtualMachine {
                     }
                 }
             },
+            Command::Goto(_) => panic!("no goto support"),
+            Command::GotoIf(_) => panic!("no if-goto support"),
+            Command::Label(_) => panic!("no label support"),
+            Command::Function(_, _) => panic!("no function support"),
+            Command::Call(_, _) => panic!("no call support"),
+            Command::Return => panic!("no return suppport"),
         };
         for a in &self.translated {
             if a.is_command() {
@@ -257,11 +263,14 @@ pub enum Command {
     BitAnd,
     BitOr,
     BitNot,
-    // Goto(String),
-    // If(String),
-    // Label(String),
+    Goto(String),
+    GotoIf(String),
+    Label(String),
     Pop(Segment),
     Push(Segment),
+    Function(String, i16),
+    Call(String, i16),
+    Return,
 }
 
 impl std::fmt::Display for Command {
@@ -278,6 +287,12 @@ impl std::fmt::Display for Command {
             Self::BitNot => write!(f, "not"),
             Self::Pop(s) => write!(f, "pop {s}"),
             Self::Push(s) => write!(f, "push {s}"),
+            Self::Goto(s) => write!(f, "goto {s}"),
+            Self::GotoIf(s) => write!(f, "if-goto {s}"),
+            Self::Label(s) => write!(f, "label {s}"),
+            Self::Function(s, i) => write!(f, "function {s} {i}"),
+            Self::Call(s, i) => write!(f, "call {s} {i}"),
+            Self::Return => write!(f, "return"),
         }
     }
 }
