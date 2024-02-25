@@ -172,21 +172,15 @@ impl VirtualMachine {
             },
             Command::Goto(l) => {
                 self.add_comment(format!("GOTO {l}"));
-                self.translated.extend([
-                    AssemblyLine::Assembly(ACommand::Symbol(self.generate_label(l)).into()),
-                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-                ])
+                for a in branching::goto(self.generate_label(l)) {
+                    self.translated.push(a.into())
+                }
             }
             Command::GotoIf(l) => {
                 self.add_comment(format!("IF-GOTO {l}"));
-                self.translated.extend([
-                    AssemblyLine::Assembly(ACommand::Reserved(ReservedSymbols::SP).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::MMinusOne).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::M).into()),
-                    AssemblyLine::Assembly(ACommand::Symbol(self.generate_label(l)).into()),
-                    AssemblyLine::Assembly(CCommand::new_jump(CComp::D, CJump::NotEqual).into()),
-                ])
+                for a in branching::if_goto(self.generate_label(l)) {
+                    self.translated.push(a.into())
+                }
             }
             Command::Label(l) => {
                 self.add_comment(format!("LABEL {l}"));
@@ -499,6 +493,7 @@ impl std::convert::From<&Segment> for UsefulSegment {
 }
 
 pub mod arithmetic;
+pub mod branching;
 pub mod memory;
 pub mod reader;
 
