@@ -208,12 +208,12 @@ impl VirtualMachine {
 
     /// Add an infinate loop.
     ///
-    /// Good practice to add one at the end of assembly to prevent the counter from going of the edge and looping back.
+    /// Good practice to add one at the end of assembly to prevent the counter from going off the edge and looping back.
     pub fn infinate_loop(&mut self, assembly: &mut impl std::iter::Extend<AssemblyLine>) {
         self.add_comment("Infinite loop at end of program".into());
         self.translated.extend([
-            AssemblyLine::Assembly(Assembly::Label("ENDLOOP".to_string()).into()),
             AssemblyLine::Assembly(ACommand::Symbol("ENDLOOP".to_string()).into()),
+            AssemblyLine::Assembly(Assembly::Label("ENDLOOP".to_string()).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
 
@@ -606,6 +606,67 @@ sub
 push static 8
 add";
 
+    const BASIC_LOOP: &'static str =
+        "// Computes the sum 1 + 2 + ... + n and pushes the result onto
+// the stack. The value n is given in argument[0], which must be 
+// initialized by the caller of this code.
+
+    push constant 0    
+    pop local 0         // sum = 0
+label LOOP
+    push argument 0     
+    push local 0
+    add
+    pop local 0	        // sum = sum + n
+    push argument 0
+    push constant 1
+    sub
+    pop argument 0      // n--
+    push argument 0
+    if-goto LOOP        // if n > 0, goto LOOP
+    push local 0        // else, pushes sum to the stack's top";
+
+    const FIBONACCI: &'static str =
+        "// Puts the first n elements of the Fibonacci series in the memory,
+    // starting at address addr. n and addr are given in argument[0] and
+    // argument[1], which must be initialized by the caller of this code.
+    
+        push argument 1         // sets THAT, the base address of the
+        pop pointer 1           // that segment, to argument[1]
+        push constant 0         // sets the series' first and second
+        pop that 0              // elements to 0 and 1, respectively       
+        push constant 1   
+        pop that 1              
+        push argument 0         // sets n, the number of remaining elements
+        push constant 2         // to be computed to argument[0] minus 2,
+        sub                     // since 2 elements were already computed.
+        pop argument 0          
+    
+    label LOOP
+        push argument 0
+        if-goto COMPUTE_ELEMENT // if n > 0, goto COMPUTE_ELEMENT
+        goto END                // otherwise, goto END
+    
+    label COMPUTE_ELEMENT
+        // that[2] = that[0] + that[1]
+        push that 0
+        push that 1
+        add
+        pop that 2
+        // THAT += 1 (updates the base address of that)
+        push pointer 1
+        push constant 1
+        add
+        pop pointer 1 
+        // updates n-- and loops          
+        push argument 0
+        push constant 1
+        sub
+        pop argument 0          
+        goto LOOP
+    
+    label END";
+
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
         let mut vm = VirtualMachine::new("file".to_string());
@@ -764,5 +825,62 @@ add";
         assert_eq!(d.read_memory(3012.into()), 42.into());
         assert_eq!(d.read_memory(3015.into()), 45.into());
         assert_eq!(d.read_memory(11.into()), 510.into());
+    }
+
+    #[test]
+    fn test_basic_loop() {
+        let ass = compile(BASIC_LOOP);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 256.into());
+        d.write_memory(1.into(), 300.into());
+        d.write_memory(2.into(), 400.into());
+        d.write_memory(400.into(), 5.into()); // 1 + 2 + 3 + 4
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 600 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 257.into());
+        assert_eq!(d.read_memory(256.into()), 15.into());
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        let ass = compile(FIBONACCI);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 256.into());
+        d.write_memory(1.into(), 300.into());
+        d.write_memory(2.into(), 400.into());
+        d.write_memory(400.into(), 6.into()); // 0 + 1 + 1 + 2 + 3 + 5
+        d.write_memory(401.into(), 3000.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 1100 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(3000.into()), 0.into());
+        assert_eq!(d.read_memory(3001.into()), 1.into());
+        assert_eq!(d.read_memory(3002.into()), 1.into());
+        assert_eq!(d.read_memory(3003.into()), 2.into());
+        assert_eq!(d.read_memory(3004.into()), 3.into());
+        assert_eq!(d.read_memory(3005.into()), 5.into());
     }
 }
