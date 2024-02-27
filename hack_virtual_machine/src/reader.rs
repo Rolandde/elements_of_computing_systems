@@ -16,6 +16,7 @@ pub struct Reader<R> {
     arg2: String,
     arg3: i16,
     line: usize,
+    in_func: bool, // True between starting a function and returning. Cannot start a new function while this is true.
 }
 
 impl<R: std::io::BufRead> Reader<R> {
@@ -28,6 +29,7 @@ impl<R: std::io::BufRead> Reader<R> {
             arg2: "".to_string(),
             arg3: 0,
             line: 0,
+            in_func: false,
         }
     }
 
@@ -190,7 +192,12 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "function" => {
                 self.assert_args(3)?;
-                Ok(Command::Function(self.check_label_func()?, self.arg3))
+                if self.in_func {
+                    Err(Error::InvalidFunction(self.line))
+                } else {
+                    self.in_func = true;
+                    Ok(Command::Function(self.check_label_func()?, self.arg3))
+                }
             }
             "call" => {
                 self.assert_args(3)?;
@@ -198,7 +205,12 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "return" => {
                 self.assert_args(1)?;
-                Ok(Command::Return)
+                if self.in_func {
+                    self.in_func = false;
+                    Ok(Command::Return)
+                } else {
+                    Err(Error::InvalidFunction(self.line))
+                }
             }
             _ => Err(Error::UnknownCommand(self.line)),
         }

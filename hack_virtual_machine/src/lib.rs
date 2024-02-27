@@ -16,7 +16,7 @@ pub const STACK_START: i16 = 256;
 pub const HEAP_START: i16 = 2048;
 
 /// This virtual register holds the address to return to after arithmetic comparisons
-pub const MEM_ARITH: ReservedSymbols = ReservedSymbols::R13;
+pub const RETURN_ADDRESS: ReservedSymbols = ReservedSymbols::R13;
 
 /// This virtual register will hold the popped value
 pub const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
@@ -240,7 +240,7 @@ impl VirtualMachine {
         }
         self.translated.extend([
             AssemblyLine::AssemblyComment(
-                MEM_ARITH.into(),
+                RETURN_ADDRESS.into(),
                 "return address set by VM before equality call".to_string(),
             ),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
@@ -258,7 +258,7 @@ impl VirtualMachine {
                 "return address calculated by VM".to_string(),
             ),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
-            AssemblyLine::Assembly(MEM_ARITH.into()),
+            AssemblyLine::Assembly(RETURN_ADDRESS.into()),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
             AssemblyLine::Assembly(ACommand::Symbol(symbol).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
@@ -413,6 +413,8 @@ impl std::convert::From<Assembly> for AssemblyLine {
 pub enum Error {
     /// The command has too few, too many, or wrong type of arguments
     InvalidArgs(usize),
+    /// Cannot define a function here
+    InvalidFunction(usize),
     /// Label or function name is invalid (does not begin with number, and is alphanumberic, _, ., and :)
     InvalidLabelFunc(usize),
     /// Upstream IO error.
@@ -431,6 +433,9 @@ impl std::fmt::Display for Error {
             Self::InvalidArgs(line) => {
                 write!(f, "wrong arg number or type on line {}", line)
             }
+            Self::InvalidFunction(line) => {
+                write!(f, "invalid function defenition on line {}", line)
+            }
             Self::InvalidLabelFunc(line) => {
                 write!(f, "invalid label or function name on line {}", line)
             }
@@ -446,6 +451,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::InvalidArgs(_) => None,
+            Self::InvalidFunction(_) => None,
             Self::InvalidLabelFunc(_) => None,
             Self::Io(e) => Some(e),
             Self::UnknownCommand(_) => None,
@@ -494,6 +500,7 @@ impl std::convert::From<&Segment> for UsefulSegment {
 
 pub mod arithmetic;
 pub mod branching;
+pub mod function;
 pub mod memory;
 pub mod reader;
 
