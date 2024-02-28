@@ -6,14 +6,16 @@ use hack_assembler::Assembly;
 /// Standalone assembly block that initializes local variables on the stack to 0.
 ///
 /// Assumes the number of vars is in the D register.
-pub fn local_vars() -> [Assembly; 10] {
+pub fn local_vars() -> [Assembly; 12] {
     [
         Assembly::Label("LOCAL_VARS".to_string()),
         CCommand::new_dest(CDest::D, CComp::DMinusOne).into(),
         ACommand::Symbol("LOCAL_END".to_string()).into(),
         CCommand::new_jump(CComp::D, CJump::Less).into(),
         ACommand::Reserved(ReservedSymbols::SP).into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::M, CComp::Zero).into(),
+        ACommand::Reserved(ReservedSymbols::SP).into(),
         CCommand::new_dest(CDest::M, CComp::MPlusOne).into(),
         ACommand::Symbol("LOCAL_VARS".to_string()).into(),
         CCommand::new_jump(CComp::One, CJump::Jump).into(),
@@ -125,4 +127,46 @@ pub fn return_from_func() -> [Assembly; 35] {
         CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_jump(CComp::One, CJump::Jump).into(),
     ]
+}
+
+mod vm_function_tests {
+    use super::*;
+
+    #[test]
+    fn test_local() {
+        let mut vm_goto = local_vars().to_vec();
+        vm_goto.push(ACommand::Address(0).into()); // `local_vars` ends on a label and that's not allowed
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_goto).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 256.into());
+        d.write_memory(256.into(), 41.into());
+        d.write_memory(257.into(), 42.into());
+        d.write_memory(258.into(), 43.into());
+        d.write_register_d(0.into()); // Add no local vars
+
+        while d.read_cpu_counter() != 10.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 256.into());
+        assert_eq!(d.read_memory(256.into()), 41.into());
+        assert_eq!(d.read_memory(257.into()), 42.into());
+        assert_eq!(d.read_memory(258.into()), 43.into());
+
+        d.computer().cycle(true);
+        d.write_register_d(2.into()); // 2 local vars
+
+        while d.read_cpu_counter() != 10.into() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 258.into());
+        assert_eq!(d.read_memory(256.into()), 0.into());
+        assert_eq!(d.read_memory(257.into()), 0.into());
+        assert_eq!(d.read_memory(258.into()), 43.into());
+    }
 }
