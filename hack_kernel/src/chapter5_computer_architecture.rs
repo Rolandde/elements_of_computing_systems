@@ -460,6 +460,14 @@ impl<'a> Debugger<'a> {
     pub fn write_memory(&mut self, address: [bool; 15], input: [bool; 16]) {
         self.computer.data_memory.cycle(address, input, true);
     }
+
+    pub fn write_register_a(&mut self, input: [bool; 16]) {
+        self.computer.cpu.reg_a.cycle(input, true);
+    }
+
+    pub fn write_register_d(&mut self, input: [bool; 16]) {
+        self.computer.cpu.reg_d.cycle(input, true);
+    }
 }
 
 #[cfg(test)]

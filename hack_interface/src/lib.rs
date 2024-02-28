@@ -184,7 +184,7 @@ impl std::convert::From<std::io::Error> for Error {
     }
 }
 
-/// Look at the internals of the [hack_kernel::Computer]
+/// Look at and set the internals of the [hack_kernel::Computer]
 pub struct Debugger<'a> {
     debug: hack_kernel::Debugger<'a>,
 }
@@ -218,6 +218,14 @@ impl<'a> Debugger<'a> {
 
     pub fn write_memory(&mut self, address: Bit15, input: Bit16) {
         self.debug.write_memory(address.i, input.i)
+    }
+
+    pub fn write_register_a(&mut self, input: Bit16) {
+        self.debug.write_register_a(input.i)
+    }
+
+    pub fn write_register_d(&mut self, input: Bit16) {
+        self.debug.write_register_d(input.i)
     }
 }
 
