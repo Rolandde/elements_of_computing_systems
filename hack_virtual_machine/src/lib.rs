@@ -59,6 +59,7 @@ impl VirtualMachine {
         self.init_equlity(arithmetic::eq(), "EQ".to_string());
         self.init_equlity(arithmetic::gt(), "GT".to_string());
         self.init_equlity(arithmetic::lt(), "LT".to_string());
+        self.init_function_local_vars();
 
         self.translated // This can be removed once function calls are implemented and the root function is called
             .push(AssemblyLine::Assembly(Assembly::Label("START".to_string())).into());
@@ -181,8 +182,27 @@ impl VirtualMachine {
                     self.generate_label(l),
                 )))
             }
-            Command::Function(_, _) => panic!("no function support"),
-            Command::Call(_, _) => panic!("no call support"),
+            Command::Function(s, l) => {
+                self.func = Some(s.to_string());
+                let name = format!("{}.{s}", self.file_name);
+                let return_address = format!("{name}$$LOCAL_VAR_INIT");
+                self.add_comment(format!("FUNCTION {name} {l}"));
+                // `function::local_vars` expects the number of local variables in the D register
+                // And return address in return register
+                self.translated.extend([
+                    AssemblyLine::Assembly(Assembly::Label(name)),
+                    AssemblyLine::Assembly(ACommand::Address(*l).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol(return_address.clone()).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+                    AssemblyLine::Assembly(RETURN_ADDRESS.into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol("LOCAL_VARS".to_string()).into()),
+                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+                    AssemblyLine::Assembly(Assembly::Label(return_address)),
+                ]);
+            }
+            Command::Call(s, a) => panic!("no call support"),
             Command::Return => panic!("no return suppport"),
         };
 
@@ -231,7 +251,6 @@ impl VirtualMachine {
     }
 
     fn call_equality(&mut self, symbol: String) {
-        // + 6 is how many commands there are below. Don't change command without changing this addition.
         let counter = self.get_counter();
         let label = format!("{symbol}_RETURN{counter}");
         self.translated.extend([
@@ -246,6 +265,22 @@ impl VirtualMachine {
             AssemblyLine::Assembly(ACommand::Symbol(symbol).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
             AssemblyLine::Assembly(Assembly::Label(label)),
+        ]);
+    }
+
+    // After setting local variables on the stack, jump to beginning of function
+    fn init_function_local_vars(&mut self) {
+        self.add_comment("local var initialization for all functions".to_string());
+        for a in crate::function::local_vars() {
+            self.translated.push(a.into())
+        }
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                RETURN_ADDRESS.into(),
+                "return address set by VM before during call".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
     }
 
