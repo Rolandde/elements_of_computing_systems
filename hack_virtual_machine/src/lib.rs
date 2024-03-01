@@ -24,7 +24,6 @@ pub const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
 /// The stacked virtual machine
 pub struct VirtualMachine {
     file_name: String,
-    command_lines: i16,
     translated: Vec<AssemblyLine>,
     func: Option<String>, // What function is the VM currently going through
     call_count: usize, // How many call have been made within the function (resets between functions)
@@ -37,7 +36,6 @@ impl VirtualMachine {
     pub fn new(file_name: String) -> Self {
         Self {
             file_name,
-            command_lines: 0,
             translated: Vec::new(),
             func: None,
             call_count: 0,
@@ -65,11 +63,6 @@ impl VirtualMachine {
         self.translated // This can be removed once function calls are implemented and the root function is called
             .push(AssemblyLine::Assembly(Assembly::Label("START".to_string())).into());
 
-        for a in &self.translated {
-            if a.is_command() {
-                self.command_lines += 1;
-            }
-        }
         assembly.extend(self.translated.drain(..));
     }
 
@@ -192,11 +185,6 @@ impl VirtualMachine {
             Command::Call(_, _) => panic!("no call support"),
             Command::Return => panic!("no return suppport"),
         };
-        for a in &self.translated {
-            if a.is_command() {
-                self.command_lines += 1;
-            }
-        }
 
         assembly.extend(self.translated.drain(..));
     }
@@ -216,12 +204,6 @@ impl VirtualMachine {
             AssemblyLine::Assembly(Assembly::Label("ENDLOOP".to_string()).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
-
-        for a in &self.translated {
-            if a.is_command() {
-                self.command_lines += 1;
-            }
-        }
 
         assembly.extend(self.translated.drain(..));
     }
@@ -250,18 +232,20 @@ impl VirtualMachine {
 
     fn call_equality(&mut self, symbol: String) {
         // + 6 is how many commands there are below. Don't change command without changing this addition.
-        let return_address = self.command_lines + 6;
+        let counter = self.get_counter();
+        let label = format!("{symbol}_RETURN{counter}");
         self.translated.extend([
             AssemblyLine::Comment(format!("calling {symbol}")),
             AssemblyLine::AssemblyComment(
-                ACommand::Address(return_address).into(),
-                "return address calculated by VM".to_string(),
+                ACommand::Symbol(label.clone()).into(),
+                "label after jump to equality".to_string(),
             ),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
             AssemblyLine::Assembly(RETURN_ADDRESS.into()),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
             AssemblyLine::Assembly(ACommand::Symbol(symbol).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+            AssemblyLine::Assembly(Assembly::Label(label)),
         ]);
     }
 
@@ -274,6 +258,12 @@ impl VirtualMachine {
             None => format!("{}${label}", self.file_name),
             Some(s) => format!("{}.{s}${label}", self.file_name),
         }
+    }
+
+    fn get_counter(&mut self) -> usize {
+        let r = self.call_count;
+        self.call_count += 1;
+        r
     }
 }
 
