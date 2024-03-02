@@ -26,13 +26,11 @@ pub fn local_vars() -> [Assembly; 12] {
 /// The assembly for the VM `call` command, which creates the frame and sets callee LCL and ARG.
 ///
 /// Assumes that the D register is set to the return address that goes first on the stack.
+/// Assumes the number of args + 5 in stored in [crate::N_ARGS_PLUS_5].
+/// The `+ 5`` is because 5 values are pushed onto the stack before the ARGS pointer is set. The VM is expected to do that addition.
 ///
 /// There is no jump to the callee and no return label. The VM will add that assembly code.
-pub fn call_stack(n_args: i16) -> [Assembly; 37] {
-    // Args for callee are pushed on the stack before this call.
-    // The ARG pointer for callee has to be set after the ARG pointer for the caller function has been stored
-    // 4 comes from 5 values being pushed on the stack, but the assembly logic always going one back after a push
-    let reposition_arg_pointer = 4 + n_args;
+pub fn call_stack() -> [Assembly; 38] {
     [
         // Return address
         ACommand::Reserved(ReservedSymbols::SP).into(),
@@ -68,9 +66,10 @@ pub fn call_stack(n_args: i16) -> [Assembly; 37] {
         CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
         // Reposition ARG pointer for callee
-        CCommand::new_dest(CDest::D, CComp::A).into(),
-        ACommand::Address(reposition_arg_pointer).into(),
-        CCommand::new_dest(CDest::D, CComp::DMinusA).into(),
+        ACommand::Reserved(crate::N_ARGS_PLUS_5).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ACommand::Reserved(ReservedSymbols::SP).into(),
+        CCommand::new_dest(CDest::D, CComp::MMinusD).into(),
         ACommand::Reserved(ReservedSymbols::ARG).into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
         // Set LCL pointer for callee (first step of callee is to set N lcl args to 0)
@@ -176,7 +175,8 @@ mod vm_function_tests {
 
     #[test]
     fn test_call_stack() {
-        let vm_goto = call_stack(3).to_vec();
+        // Test assumes 3 args for callee
+        let vm_goto = call_stack().to_vec();
         let mut rom = hack_interface::RomWriter::new();
         for i in hack_assembler::assemble_from_slice(&vm_goto).unwrap() {
             rom.write_instruction(i);
@@ -189,6 +189,7 @@ mod vm_function_tests {
         d.write_memory(ReservedSymbols::THIS.into(), 3000.into());
         d.write_memory(ReservedSymbols::THAT.into(), 4000.into());
         d.write_register_d(512.into()); // Return address expected on A register
+        d.write_memory(crate::N_ARGS_PLUS_5.into(), 8.into()); // 5 + 3 (args); see function docs
 
         let i = i16::try_from(vm_goto.len()).unwrap();
         while d.read_cpu_counter() != i.into() {

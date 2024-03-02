@@ -10,16 +10,16 @@ use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSym
 use hack_assembler::Assembly;
 
 /// Memory address at which the start pointer starts
-pub const STACK_START: i16 = 256;
-
-/// Memory address at which the heap starts
-pub const HEAP_START: i16 = 2048;
+const STACK_START: i16 = 256;
 
 /// This virtual register holds the address to return to after arithmetic comparisons
-pub const RETURN_ADDRESS: ReservedSymbols = ReservedSymbols::R13;
+const RETURN_ADDRESS: ReservedSymbols = ReservedSymbols::R13;
 
 /// This virtual register will hold the popped value
-pub const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
+const MEM_POP: ReservedSymbols = ReservedSymbols::R14;
+
+/// Where are number of args for calling function stored
+const N_ARGS_PLUS_5: ReservedSymbols = ReservedSymbols::R14;
 
 /// The stacked virtual machine
 pub struct VirtualMachine {
