@@ -60,6 +60,8 @@ impl VirtualMachine {
         self.init_equlity(arithmetic::gt(), "GT".to_string());
         self.init_equlity(arithmetic::lt(), "LT".to_string());
         self.init_function_local_vars();
+        self.init_call();
+        self.init_return();
 
         self.translated // This can be removed once function calls are implemented and the root function is called
             .push(AssemblyLine::Assembly(Assembly::Label("START".to_string())).into());
@@ -191,19 +193,46 @@ impl VirtualMachine {
                 // And return address in return register
                 self.translated.extend([
                     AssemblyLine::Assembly(Assembly::Label(name)),
-                    AssemblyLine::Assembly(ACommand::Address(*l).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
                     AssemblyLine::Assembly(ACommand::Symbol(return_address.clone()).into()),
                     AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
                     AssemblyLine::Assembly(RETURN_ADDRESS.into()),
                     AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+                    AssemblyLine::Assembly(ACommand::Address(*l).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
                     AssemblyLine::Assembly(ACommand::Symbol("LOCAL_VARS".to_string()).into()),
                     AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
                     AssemblyLine::Assembly(Assembly::Label(return_address)),
                 ]);
             }
-            Command::Call(s, a) => panic!("no call support"),
-            Command::Return => panic!("no return suppport"),
+            Command::Call(s, args) => {
+                let counter = self.get_counter();
+                let ret_str = match &self.func {
+                    None => format!("{}$$ret.{counter}", self.file_name),
+                    Some(f) => format!("{}.{f}$$ret.{counter}", self.file_name),
+                };
+                self.translated.extend([
+                    AssemblyLine::AssemblyComment(
+                        ACommand::Address(args + 5).into(),
+                        "number of args + 5".to_string(),
+                    ),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+                    AssemblyLine::Assembly(ACommand::Reserved(N_ARGS_PLUS_5).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol(s.to_string()).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+                    AssemblyLine::Assembly(ACommand::Reserved(RETURN_ADDRESS).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol(ret_str.clone()).into()),
+                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+                    AssemblyLine::Assembly(ACommand::Symbol("CALL".to_string()).into()),
+                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+                    AssemblyLine::Assembly(Assembly::Label(ret_str)),
+                ]);
+            }
+            Command::Return => self.translated.extend([
+                AssemblyLine::Assembly(ACommand::Symbol("RETURN".to_string()).into()),
+                AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+            ]),
         };
 
         assembly.extend(self.translated.drain(..));
@@ -277,11 +306,37 @@ impl VirtualMachine {
         self.translated.extend([
             AssemblyLine::AssemblyComment(
                 RETURN_ADDRESS.into(),
-                "return address set by VM before during call".to_string(),
+                "return address set by VM before jump to this block".to_string(),
             ),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
+    }
+
+    fn init_call(&mut self) {
+        self.translated
+            .push(Assembly::Label("CALL".to_string()).into());
+        self.add_comment("call assembly used by all".to_string());
+        for a in crate::function::call_stack() {
+            self.translated.push(a.into())
+        }
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                RETURN_ADDRESS.into(),
+                "return address set by VM before jump to this block".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+    }
+
+    fn init_return(&mut self) {
+        self.translated
+            .push(Assembly::Label("RETURN".to_string()).into());
+        self.add_comment("return assembly used by all".to_string());
+        for a in crate::function::return_from_func() {
+            self.translated.push(a.into())
+        }
     }
 
     fn add_comment(&mut self, comment: String) {
