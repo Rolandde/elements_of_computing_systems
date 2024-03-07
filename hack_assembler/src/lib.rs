@@ -5,6 +5,9 @@
 //! The [Assembler] is the core process, taking a single [Assembly] line at a time and alongside the symbol table, producing [hack_interface::Bit16] machine instructions. [FirstPass] creates a [SymbolTable]. [SecondPass] is an iterator that wraps [Assembler].
 //!
 //! [FirstPass] has to see all assembly lines, because [Assembly::Label] can be used before it is defined. If you know know there are no labels in the `.asm` file, skip the first pass and use [SymbolTable::empty] for the second pass. Note that the danger is that everything will work just fine with a [SecondPass] even if labels are present in your assembly code. This will result in wrong machine code, as an A-command with a label (`@END`) will be misinterpreted as a new address in RAM rather than an instruction position in the ROM. There are ways (that either increase code complexity or decrease efficiency) to prevent this type of bug, but the current solution is to always run first pass, unless you know it is not needed.
+//!
+//! # About Labels
+//! Labels don't exist for the machine, so they are special. A label as the last line of assembly will throw an error, as it refers to a command that does not exist. Multiple labels can follow each other. They will all refer to the same command line.
 
 pub mod io;
 pub mod parts;
@@ -197,6 +200,15 @@ mod assembly_tests {
         let rom = b"//Comment\n@0\n(Label)\n//Comment\n@1";
         let symbol_table = FirstPass::from_buffer(&rom[..])?;
         assert_eq!(symbol_table.get("Label"), Some(1.into()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_multi_label() -> Result<(), hack_interface::Error> {
+        let rom = b"//Comment\n@0\n(Label)\n(Label2)\n//Comment\n@1";
+        let symbol_table = FirstPass::from_buffer(&rom[..])?;
+        assert_eq!(symbol_table.get("Label"), Some(1.into()));
+        assert_eq!(symbol_table.get("Label2"), Some(1.into()));
         Ok(())
     }
 }

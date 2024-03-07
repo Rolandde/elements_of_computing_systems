@@ -50,7 +50,7 @@ impl SymbolTable {
 /// Go through assembly and generate a [SymbolTable] that holds the labels.
 pub struct FirstPass {
     inner: std::collections::HashMap<String, hack_interface::Bit15>,
-    last_label: Option<String>,
+    labels: Vec<String>,
     line_count: usize,
     command_count: i16,
 }
@@ -59,7 +59,7 @@ impl FirstPass {
     pub fn new() -> Self {
         Self {
             inner: std::collections::HashMap::new(),
-            last_label: None,
+            labels: Vec::new(),
             line_count: 0,
             command_count: 0,
         }
@@ -77,9 +77,10 @@ impl FirstPass {
     /// # Ok::<(), hack_interface::Error>(())
     /// ```
     pub fn create(self) -> Result<SymbolTable, hack_interface::Error> {
-        match self.last_label {
-            None => Ok(SymbolTable { inner: self.inner }),
-            Some(_) => Err(hack_interface::Error::SymbolTable(self.line_count)),
+        if self.labels.is_empty() {
+            Ok(SymbolTable { inner: self.inner })
+        } else {
+            Err(hack_interface::Error::SymbolTable(self.line_count))
         }
     }
 
@@ -140,25 +141,17 @@ impl FirstPass {
         self.line_count += 1;
         match line {
             FirstPassLine::Empty => Ok(()),
-            FirstPassLine::Label(s) => match self.last_label {
-                None => {
-                    self.last_label = Some(s);
-                    Ok(())
-                }
-                Some(_) => Err(hack_interface::Error::SymbolTable(self.line_count)),
-            },
-            FirstPassLine::Command => match self.last_label.take() {
-                None => {
-                    self.command_count += 1;
-                    Ok(())
-                }
-                Some(s) => {
+            FirstPassLine::Label(s) => {
+                self.labels.push(s);
+                Ok(())
+            }
+            FirstPassLine::Command => {
+                while let Some(s) = self.labels.pop() {
                     self.pass_label(s)?;
-                    self.command_count += 1;
-                    self.last_label = None;
-                    Ok(())
                 }
-            },
+                self.command_count += 1;
+                Ok(())
+            }
         }
     }
 
