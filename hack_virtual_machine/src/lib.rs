@@ -207,6 +207,7 @@ impl VirtualMachine {
                 ]);
             }
             Command::Call(s, args) => {
+                self.add_comment(format!("CALL {s} {args}"));
                 let counter = self.get_counter();
                 let ret_str = match &self.func {
                     None => format!("{}$$ret.{counter}", self.file_name),
@@ -231,10 +232,14 @@ impl VirtualMachine {
                     AssemblyLine::Assembly(Assembly::Label(ret_str)),
                 ]);
             }
-            Command::Return => self.translated.extend([
-                AssemblyLine::Assembly(ACommand::Symbol("RETURN".to_string()).into()),
-                AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-            ]),
+            Command::Return => {
+                self.add_comment("RETURN".to_string());
+                self.func = None;
+                self.translated.extend([
+                    AssemblyLine::Assembly(ACommand::Symbol("RETURN".to_string()).into()),
+                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+                ])
+            }
         };
 
         assembly.extend(self.translated.drain(..));
