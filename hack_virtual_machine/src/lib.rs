@@ -5,6 +5,9 @@
 //!
 //! # Wherefore impl Trait
 //! [VirtualMachine] dumps assembly into a container that implements `extend`. I originally had that as a `Vec`. This makes sense for dumping all assembly lines into memory. But then I wanted to have an iterator that gets vm commands in chunks and throws out assembly in chunks. That means I need to pop out elements from the front of the collection. `VedDeque` does that nice. So now I have a impl Trait.
+//!
+//! # Do I need a file name?
+//! Yes, but the book is confusing about it. The file name is necessary because labels and access to static segments are file specific. Writing `label foo` or `static pop 3` in two different files translates to different assembly code. The confusion comes when dealing with `function` commands. My initial assumption was that `function bar` in a file `foo.vm` generates a assembly label `(foo.bar)`. However, the excersises in Chapter 8 have `function foo.bar` in the file `foo.vm`. This leads me to believe the jack compiler generates those unique function names and the VM doesn't have to deal with it. I have removed the use of the file name from translating the `function` command.
 
 use hack_assembler::parts::{ACommand, CCommand, CComp, CDest, CJump, ReservedSymbols};
 use hack_assembler::Assembly;
@@ -186,13 +189,12 @@ impl VirtualMachine {
             }
             Command::Function(s, l) => {
                 self.func = Some(s.to_string());
-                let name = format!("{}.{s}", self.file_name);
-                let return_address = format!("{name}$$LOCAL_VAR_INIT");
-                self.add_comment(format!("FUNCTION {name} {l}"));
+                let return_address = format!("{s}$$LOCAL_VAR_INIT");
+                self.add_comment(format!("FUNCTION {s} {l}"));
                 // `function::local_vars` expects the number of local variables in the D register
                 // And return address in return register
                 self.translated.extend([
-                    AssemblyLine::Assembly(Assembly::Label(name)),
+                    AssemblyLine::Assembly(Assembly::Label(s.to_string())),
                     AssemblyLine::Assembly(ACommand::Symbol(return_address.clone()).into()),
                     AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
                     AssemblyLine::Assembly(RETURN_ADDRESS.into()),
@@ -208,7 +210,7 @@ impl VirtualMachine {
                 let counter = self.get_counter();
                 let ret_str = match &self.func {
                     None => format!("{}$$ret.{counter}", self.file_name),
-                    Some(f) => format!("{}.{f}$$ret.{counter}", self.file_name),
+                    Some(f) => format!("{f}$$ret.{counter}"),
                 };
                 self.translated.extend([
                     AssemblyLine::AssemblyComment(
@@ -346,7 +348,7 @@ impl VirtualMachine {
     fn generate_label(&self, label: &str) -> String {
         match &self.func {
             None => format!("{}${label}", self.file_name),
-            Some(s) => format!("{}.{s}${label}", self.file_name),
+            Some(s) => format!("{s}${label}"),
         }
     }
 
