@@ -55,7 +55,7 @@ impl VirtualMachine {
             AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
             AssemblyLine::Assembly(ReservedSymbols::SP.into()),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
-            AssemblyLine::Assembly(ACommand::Symbol("START".to_string()).into()), // Starting a program requires function calls, which are for the next chapter
+            AssemblyLine::Assembly(ACommand::Symbol("Sys.init".to_string()).into()), // The VM expects this function somewhere
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
         ]);
 
@@ -65,9 +65,6 @@ impl VirtualMachine {
         self.init_function_local_vars();
         self.init_call();
         self.init_return();
-
-        self.translated // This can be removed once function calls are implemented and the root function is called
-            .push(AssemblyLine::Assembly(Assembly::Label("START".to_string())).into());
 
         assembly.extend(self.translated.drain(..));
     }
@@ -774,10 +771,12 @@ label LOOP
         sub
         return";
 
+    // Utility function that initializes the VM, makes a barebone `Sys.init` call, finishes up the VM
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
         let mut vm = VirtualMachine::new("file".to_string());
         vm.init(&mut al);
+        vm.compile(&&&Command::Function("Sys.init".to_string(), 0), &mut al);
         for c in reader::CommandLines::new(vm_lines.as_bytes()) {
             vm.compile(&c.unwrap(), &mut al);
         }
