@@ -430,4 +430,16 @@ mod vm_parser_tests {
         assert!(reader.parse_command().is_err());
         Ok(())
     }
+
+    #[test]
+    fn test_function() -> Result<(), Error> {
+        let input = b"function test.func 3";
+        let mut reader = Reader::new(&input[..]);
+        reader.read_command()?;
+        assert_eq!(
+            reader.parse_command()?,
+            Command::Function("test.func".to_string(), 3)
+        );
+        Ok(())
+    }
 }

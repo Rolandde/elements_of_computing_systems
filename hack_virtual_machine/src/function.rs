@@ -83,7 +83,7 @@ pub fn call_stack() -> [Assembly; 38] {
 /// VM `return` assembly code.
 ///
 /// Can be used by the VM as is.
-pub fn return_from_func() -> [Assembly; 34] {
+pub fn return_from_func() -> [Assembly; 40] {
     [
         // LCL is above frame to restore
         ACommand::Reserved(ReservedSymbols::LCL).into(),
@@ -102,6 +102,13 @@ pub fn return_from_func() -> [Assembly; 34] {
         CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::D, CComp::M).into(),
         ACommand::Reserved(ReservedSymbols::THIS).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
+        // Store current top stack value onto caller stack (marked by callee ARG)
+        ACommand::Reserved(ReservedSymbols::SP).into(),
+        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ACommand::Reserved(ReservedSymbols::ARG).into(),
+        CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
         // Callee ARG stores where SP was for the caller
         ACommand::Reserved(ReservedSymbols::ARG).into(),
@@ -215,6 +222,8 @@ mod vm_function_tests {
         }
         let mut c = rom.create_load_rom();
         let mut d = hack_interface::Debugger::new(&mut c);
+        d.write_memory(0.into(), 450.into()); // Callee stack
+        d.write_memory(449.into(), 42.into()); // The return value on top of calee stack
         d.write_memory(ReservedSymbols::LCL.into(), 400.into()); // LCL points to the top of the frame
         d.write_memory(399.into(), 4000.into());
         d.write_memory(398.into(), 3000.into());
@@ -234,6 +243,7 @@ mod vm_function_tests {
         // ARG pointer marks the stack pointer the function being returned to (that put the args there in the first place)
         // +1 because the function returning always puts on return value on top of stack
         assert_eq!(d.read_memory(0.into()), 381.into());
+        assert_eq!(d.read_memory(380.into()), 42.into());
         assert_eq!(d.read_cpu_counter(), 10000.into());
     }
 }

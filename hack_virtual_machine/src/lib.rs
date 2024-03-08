@@ -754,6 +754,19 @@ label LOOP
     
     label END";
 
+    const SIMPLE_FUNCTION: &'static str = "// Performs a simple calculation and returns the result.
+    // argument[0] and argument[1] must be set by the caller of this code.
+    function SimpleFunction.test 2
+        push local 0
+        push local 1
+        add
+        not
+        push argument 0
+        add
+        push argument 1
+        sub
+        return";
+
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
         let mut vm = VirtualMachine::new("file".to_string());
@@ -969,5 +982,51 @@ label LOOP
         assert_eq!(d.read_memory(3003.into()), 2.into());
         assert_eq!(d.read_memory(3004.into()), 3.into());
         assert_eq!(d.read_memory(3005.into()), 5.into());
+    }
+
+    #[test]
+    fn test_simple_function() {
+        let ass = compile(SIMPLE_FUNCTION);
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        // Run the first 5 instructions, which set the stack pointer, and then overwrite them
+        for _ in 0..5 {
+            d.computer().cycle(false);
+        }
+
+        d.write_memory(0.into(), 317.into());
+        d.write_memory(1.into(), 317.into());
+        d.write_memory(2.into(), 310.into());
+        d.write_memory(3.into(), 3000.into());
+        d.write_memory(4.into(), 4000.into());
+        d.write_memory(317.into(), 42.into()); // Testing if LCL segment is set to 0
+        d.write_memory(318.into(), 42.into());
+        d.write_memory(310.into(), 1234.into());
+        d.write_memory(311.into(), 37.into());
+        d.write_memory(312.into(), 1000.into()); // The frame
+        d.write_memory(313.into(), 305.into());
+        d.write_memory(314.into(), 300.into());
+        d.write_memory(315.into(), 3010.into());
+        d.write_memory(316.into(), 4010.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 300 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 311.into());
+        assert_eq!(d.read_memory(1.into()), 305.into());
+        assert_eq!(d.read_memory(2.into()), 300.into());
+        assert_eq!(d.read_memory(3.into()), 3010.into());
+        assert_eq!(d.read_memory(4.into()), 4010.into());
+        assert_eq!(d.read_memory(310.into()), 1196.into());
     }
 }
