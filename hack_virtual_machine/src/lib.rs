@@ -831,6 +831,45 @@ label LOOP
         add
         return";
 
+    const FIBONACCI_SYS: &'static str =
+        "// Pushes a constant, say n, onto the stack, and calls the Main.fibonacii
+    // function, which computes the n'th element of the Fibonacci series.
+    // Note that by convention, the Sys.init function is called \"automatically\" 
+    // by the bootstrap code written by the VM translator.
+    function Sys.init 0
+        push constant 4
+        call Main.fibonacci 1   // computes the 4'th fibonacci element
+    label END  
+        goto END                // loops infinitely
+        return";
+
+    const FIBONACCI_MAIN: &'static str =
+        "// Computes the n'th element of the Fibonacci series, recursively.
+    // n is given in argument[0]. Called by the Sys.init function 
+    // (part of the Sys.vm file), which sets argument[0] to an input
+    // value and then calls Main.fibonacci.
+    
+    function Main.fibonacci 0
+        push argument 0
+        push constant 2
+        lt                     
+        if-goto N_LT_2        
+        goto N_GE_2
+    label N_LT_2               // if n < 2 returns n
+        push argument 0        
+        return
+    label N_GE_2               // if n >= 2 returns fib(n - 2) + fib(n - 1)
+        push argument 0
+        push constant 2
+        sub
+        call Main.fibonacci 1  // computes fib(n - 2)
+        push argument 0
+        push constant 1
+        sub
+        call Main.fibonacci 1  // computes fib(n - 1)
+        add                    // returns fib(n - 1) + fib(n - 2)
+        return";
+
     // Utility function that initializes the VM, makes a barebone `Sys.init` call, finishes up the VM
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
@@ -1148,6 +1187,54 @@ label LOOP
         assert_eq!(d.read_memory(4.into()), 5000.into());
         assert_eq!(d.read_memory(5.into()), 135.into());
         assert_eq!(d.read_memory(6.into()), 246.into());
+    }
+
+    #[test]
+    fn test_fibonacci_calls() {
+        let mut al = Vec::new();
+        let mut vm = VirtualMachine::new("Sys".to_string());
+        vm.init(&mut al);
+        for c in reader::CommandLines::new(FIBONACCI_SYS.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+        vm.update_file_name("Main".to_string());
+        for c in reader::CommandLines::new(FIBONACCI_MAIN.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+
+        vm.flush(&mut al);
+        let mut ass = Vec::new();
+        for l in al {
+            match l {
+                AssemblyLine::Assembly(a) => ass.push(a),
+                AssemblyLine::AssemblyComment(a, _) => ass.push(a),
+                AssemblyLine::Comment(_) => {}
+            }
+        }
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        // Run the first 5 instructions, which set the stack pointer, and then overwrite them
+        for _ in 0..5 {
+            d.computer().cycle(false);
+        }
+
+        d.write_memory(0.into(), 261.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 6000 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 262.into());
+        assert_eq!(d.read_memory(261.into()), 3.into());
     }
 }
 
