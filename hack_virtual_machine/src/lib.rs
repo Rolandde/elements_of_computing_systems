@@ -1129,7 +1129,10 @@ label LOOP
 
         d.write_memory(0.into(), 261.into());
         d.write_memory(1.into(), 261.into());
-        d.write_memory(2.into(), 257.into());
+        d.write_memory(2.into(), 256.into());
+        for a in 261..300 {
+            d.write_memory(a.into(), (-1).into()); // -1s on the stack to make sure local variables are set to 0
+        }
 
         let mut i = 0;
         // Number of cycles from book
@@ -1139,6 +1142,12 @@ label LOOP
         }
 
         assert_eq!(d.read_memory(0.into()), 261.into());
+        assert_eq!(d.read_memory(1.into()), 261.into());
+        assert_eq!(d.read_memory(2.into()), 256.into());
+        assert_eq!(d.read_memory(3.into()), 4000.into());
+        assert_eq!(d.read_memory(4.into()), 5000.into());
+        assert_eq!(d.read_memory(5.into()), 135.into());
+        assert_eq!(d.read_memory(6.into()), 246.into());
     }
 }
 
