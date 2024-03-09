@@ -870,6 +870,58 @@ label LOOP
         add                    // returns fib(n - 1) + fib(n - 2)
         return";
 
+    const STATIC_TEST_SYS: &'static str =
+        "// Tests that different functions, stored in two different 
+    // class files, manipulate the static segment correctly. 
+    function Sys.init 0
+        push constant 6
+        push constant 8
+        call Class1.set 2
+        pop temp 0 // dumps the return value
+        push constant 23
+        push constant 15
+        call Class2.set 2
+        pop temp 0 // dumps the return value
+        call Class1.get 0
+        call Class2.get 0
+    label END
+        goto END
+        return";
+
+    const STATIC_TEST_CLASS1: &'static str =
+        "// Stores two supplied arguments in static[0] and static[1].
+    function Class1.set 0
+        push argument 0
+        pop static 0
+        push argument 1
+        pop static 1
+        push constant 0
+        return
+    
+    // Returns static[0] - static[1].
+    function Class1.get 0
+        push static 0
+        push static 1
+        sub
+        return";
+
+    const STATIC_TEST_CLASS2: &'static str =
+        "// Stores two supplied arguments in static[0] and static[1].
+    function Class2.set 0
+        push argument 0
+        pop static 0
+        push argument 1
+        pop static 1
+        push constant 0
+        return
+    
+    // Returns static[0] - static[1].
+    function Class2.get 0
+        push static 0
+        push static 1
+        sub
+        return";
+
     // Utility function that initializes the VM, makes a barebone `Sys.init` call, finishes up the VM
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
@@ -1235,6 +1287,60 @@ label LOOP
 
         assert_eq!(d.read_memory(0.into()), 262.into());
         assert_eq!(d.read_memory(261.into()), 3.into());
+    }
+
+    // The book test says both 256 and 261 as the stack start. The solution is based on 261.
+    #[test]
+    fn test_static_calls() {
+        let mut al = Vec::new();
+        let mut vm = VirtualMachine::new("Sys".to_string());
+        vm.init(&mut al);
+        for c in reader::CommandLines::new(STATIC_TEST_SYS.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+        vm.update_file_name("Class1".to_string());
+        for c in reader::CommandLines::new(STATIC_TEST_CLASS1.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+        vm.update_file_name("Class2".to_string());
+        for c in reader::CommandLines::new(STATIC_TEST_CLASS2.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+
+        vm.flush(&mut al);
+        let mut ass = Vec::new();
+        for l in al {
+            match l {
+                AssemblyLine::Assembly(a) => ass.push(a),
+                AssemblyLine::AssemblyComment(a, _) => ass.push(a),
+                AssemblyLine::Comment(_) => {}
+            }
+        }
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        // Run the first 5 instructions, which set the stack pointer, and then overwrite them
+        for _ in 0..5 {
+            d.computer().cycle(false);
+        }
+
+        d.write_memory(0.into(), 261.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 2500 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 263.into());
+        assert_eq!(d.read_memory(261.into()), (-2).into());
+        assert_eq!(d.read_memory(262.into()), (8).into());
     }
 }
 
