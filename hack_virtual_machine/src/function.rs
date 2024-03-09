@@ -83,8 +83,19 @@ pub fn call_stack() -> [Assembly; 38] {
 /// VM `return` assembly code.
 ///
 /// Can be used by the VM as is.
-pub fn return_from_func() -> [Assembly; 40] {
+pub fn return_from_func() -> [Assembly; 47] {
     [
+        // Return address is 5 elements from top of frame
+        ACommand::Address(5).into(),
+        CCommand::new_dest(CDest::D, CComp::A).into(),
+        // LCL is above frame to restore
+        ACommand::Reserved(ReservedSymbols::LCL).into(),
+        // Store return address, as it will be overwritten if ARG was 0 (ARG pointer is on return address)
+        CCommand::new_dest(CDest::D, CComp::MMinusD).into(),
+        CCommand::new_dest(CDest::A, CComp::D).into(),
+        CCommand::new_dest(CDest::D, CComp::M).into(),
+        ACommand::Reserved(ReservedSymbols::R15).into(),
+        CCommand::new_dest(CDest::M, CComp::D).into(),
         // LCL is above frame to restore
         ACommand::Reserved(ReservedSymbols::LCL).into(),
         CCommand::new_dest(CDest::D, CComp::MMinusOne).into(),
@@ -130,9 +141,8 @@ pub fn return_from_func() -> [Assembly; 40] {
         CCommand::new_dest(CDest::D, CComp::M).into(),
         ACommand::Reserved(ReservedSymbols::LCL).into(),
         CCommand::new_dest(CDest::M, CComp::D).into(),
-        // Jump to return address
-        ACommand::Reserved(ReservedSymbols::R14).into(),
-        CCommand::new_dest(CDest::A, CComp::MMinusOne).into(),
+        // Jump to return address (stored at beginning of block)
+        ACommand::Reserved(ReservedSymbols::R15).into(),
         CCommand::new_dest(CDest::A, CComp::M).into(),
         CCommand::new_jump(CComp::One, CJump::Jump).into(),
     ]
@@ -245,5 +255,33 @@ mod vm_function_tests {
         assert_eq!(d.read_memory(0.into()), 381.into());
         assert_eq!(d.read_memory(380.into()), 42.into());
         assert_eq!(d.read_cpu_counter(), 10000.into());
+    }
+
+    #[test]
+    fn test_call_and_return() {
+        let mut vm_cr = call_stack().to_vec();
+        vm_cr.extend(return_from_func().to_vec());
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&vm_cr).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        d.write_memory(0.into(), 300.into());
+        d.write_memory(ReservedSymbols::LCL.into(), 280.into());
+        d.write_memory(ReservedSymbols::ARG.into(), 250.into());
+        d.write_memory(ReservedSymbols::THIS.into(), 3000.into());
+        d.write_memory(ReservedSymbols::THAT.into(), 4000.into());
+        d.write_register_d(10.into());
+        d.write_memory(crate::N_ARGS_PLUS_5.into(), 5.into());
+
+        for _ in 0..vm_cr.len() {
+            d.computer().cycle(false);
+        }
+
+        assert_eq!(d.read_memory(0.into()), 301.into());
+        assert_eq!(d.read_cpu_counter(), 10.into());
     }
 }

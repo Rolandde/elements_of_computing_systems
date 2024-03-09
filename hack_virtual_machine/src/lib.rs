@@ -204,30 +204,7 @@ impl VirtualMachine {
                 ]);
             }
             Command::Call(s, args) => {
-                self.add_comment(format!("CALL {s} {args}"));
-                let counter = self.get_counter();
-                let ret_str = match &self.func {
-                    None => format!("{}$$ret.{counter}", self.file_name),
-                    Some(f) => format!("{f}$$ret.{counter}"),
-                };
-                self.translated.extend([
-                    AssemblyLine::AssemblyComment(
-                        ACommand::Address(args + 5).into(),
-                        "number of args + 5".to_string(),
-                    ),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
-                    AssemblyLine::Assembly(ACommand::Reserved(N_ARGS_PLUS_5).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
-                    AssemblyLine::Assembly(ACommand::Symbol(s.to_string()).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
-                    AssemblyLine::Assembly(ACommand::Reserved(RETURN_ADDRESS).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
-                    AssemblyLine::Assembly(ACommand::Symbol(ret_str.clone()).into()),
-                    AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
-                    AssemblyLine::Assembly(ACommand::Symbol("CALL".to_string()).into()),
-                    AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
-                    AssemblyLine::Assembly(Assembly::Label(ret_str)),
-                ]);
+                self.call_call(s, *args);
             }
             Command::Return => {
                 self.add_comment("RETURN".to_string());
@@ -318,9 +295,9 @@ impl VirtualMachine {
     }
 
     fn init_call(&mut self) {
+        self.add_comment("call assembly used by all".to_string());
         self.translated
             .push(Assembly::Label("CALL".to_string()).into());
-        self.add_comment("call assembly used by all".to_string());
         for a in crate::function::call_stack() {
             self.translated.push(a.into())
         }
@@ -331,6 +308,33 @@ impl VirtualMachine {
             ),
             AssemblyLine::Assembly(CCommand::new_dest(CDest::A, CComp::M).into()),
             AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+        ]);
+    }
+
+    fn call_call(&mut self, s: &str, args: i16) {
+        self.add_comment(format!("CALL {s} {args}"));
+        let counter = self.get_counter();
+        let ret_str = match &self.func {
+            None => format!("{}$$ret.{counter}", self.file_name),
+            Some(f) => format!("{f}$$ret.{counter}"),
+        };
+        self.translated.extend([
+            AssemblyLine::AssemblyComment(
+                ACommand::Address(args + 5).into(),
+                "number of args + 5".to_string(),
+            ),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+            AssemblyLine::Assembly(ACommand::Reserved(N_ARGS_PLUS_5).into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+            AssemblyLine::Assembly(ACommand::Symbol(s.to_string()).into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+            AssemblyLine::Assembly(ACommand::Reserved(RETURN_ADDRESS).into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::M, CComp::D).into()),
+            AssemblyLine::Assembly(ACommand::Symbol(ret_str.clone()).into()),
+            AssemblyLine::Assembly(CCommand::new_dest(CDest::D, CComp::A).into()),
+            AssemblyLine::Assembly(ACommand::Symbol("CALL".to_string()).into()),
+            AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
+            AssemblyLine::Assembly(Assembly::Label(ret_str)),
         ]);
     }
 
@@ -771,6 +775,62 @@ label LOOP
         sub
         return";
 
+    const NESTED_CALL: &'static str = "// Calls Sys.main() and stores a return value in temp 1.
+    // Does not return (enters infinite loop).
+    // The VM implementation starts running this function, by default.
+    function Sys.init 0
+        push constant 4000	// tests that THIS and THAT are handled correctly
+        pop pointer 0
+        push constant 5000
+        pop pointer 1
+        call Sys.main 0
+        pop temp 1
+        label LOOP
+        goto LOOP
+        return
+    
+    // Sets locals 1, 2 and 3 to some values. Leaves locals 0 and 4 unchanged, 
+    // to test that the 'function' VM command initliazes them to 0 (the test 
+    // script sets them to -1 before this code starts running).
+    // Calls Sys.add12(123) and stores the return value (should be 135) in temp 0.
+    // Returns local 0 + local 1 + local 2 + local 3 + local 4 (should be 456), to 
+    // confirm that locals were not mangled by the function call.
+    function Sys.main 5
+        push constant 4001
+        pop pointer 0
+        push constant 5001
+        pop pointer 1
+        push constant 200
+        pop local 1
+        push constant 40
+        pop local 2
+        push constant 6
+        pop local 3
+        push constant 123
+        call Sys.add12 1
+        pop temp 0
+        push local 0
+        push local 1
+        push local 2
+        push local 3
+        push local 4
+        add
+        add
+        add
+        add
+        return
+    
+    // Returns (argument 0) + 12.
+    function Sys.add12 0
+        push constant 4002
+        pop pointer 0
+        push constant 5002
+        pop pointer 1
+        push argument 0
+        push constant 12
+        add
+        return";
+
     // Utility function that initializes the VM, makes a barebone `Sys.init` call, finishes up the VM
     fn compile(vm_lines: &str) -> Vec<Assembly> {
         let mut al = Vec::new();
@@ -1034,5 +1094,118 @@ label LOOP
         assert_eq!(d.read_memory(3.into()), 3010.into());
         assert_eq!(d.read_memory(4.into()), 4010.into());
         assert_eq!(d.read_memory(310.into()), 1196.into());
+    }
+
+    // I've changed the VM code for this function, adding a return statement to Sys.init
+    #[test]
+    fn test_nested_calls() {
+        let mut al = Vec::new();
+        let mut vm = VirtualMachine::new("Sys".to_string());
+        vm.init(&mut al);
+        for c in reader::CommandLines::new(NESTED_CALL.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+        vm.flush(&mut al);
+        let mut ass = Vec::new();
+        for l in al {
+            match l {
+                AssemblyLine::Assembly(a) => ass.push(a),
+                AssemblyLine::AssemblyComment(a, _) => ass.push(a),
+                AssemblyLine::Comment(_) => {}
+            }
+        }
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        // Run the first 5 instructions, which set the stack pointer, and then overwrite them
+        for _ in 0..5 {
+            d.computer().cycle(false);
+        }
+
+        d.write_memory(0.into(), 261.into());
+        d.write_memory(1.into(), 261.into());
+        d.write_memory(2.into(), 257.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 4000 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 261.into());
+    }
+}
+
+// Functions are hard. I had to simplify some book tests to figure out where exactly they were failing
+#[cfg(test)]
+mod my_tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_nested() {
+        let code = "// Calls Sys.main() and stores a return value in temp 1.
+    // Does not return (enters infinite loop).
+    // The VM implementation starts running this function, by default.
+    function Sys.init 0
+        push constant 4000	// tests that THIS and THAT are handled correctly
+        pop pointer 0
+        push constant 5000
+        pop pointer 1
+        call Sys.main 0
+        pop temp 1
+        label LOOP
+        goto LOOP
+        return
+
+    function Sys.main 0
+        push constant 4001
+        return  
+        ";
+        let mut al = Vec::new();
+        let mut vm = VirtualMachine::new("Sys".to_string());
+        vm.init(&mut al);
+        for c in reader::CommandLines::new(code.as_bytes()) {
+            vm.compile(&c.unwrap(), &mut al);
+        }
+        vm.flush(&mut al);
+        let mut ass = Vec::new();
+        for l in al {
+            match l {
+                AssemblyLine::Assembly(a) => ass.push(a),
+                AssemblyLine::AssemblyComment(a, _) => ass.push(a),
+                AssemblyLine::Comment(_) => {}
+            }
+        }
+
+        let mut rom = hack_interface::RomWriter::new();
+        for i in hack_assembler::assemble_from_slice(&ass).unwrap() {
+            rom.write_instruction(i);
+        }
+        let mut c = rom.create_load_rom();
+        let mut d = hack_interface::Debugger::new(&mut c);
+
+        // Run the first 5 instructions, which set the stack pointer, and then overwrite them
+        for _ in 0..5 {
+            d.computer().cycle(false);
+        }
+
+        d.write_memory(0.into(), 261.into());
+        d.write_memory(1.into(), 261.into());
+        d.write_memory(2.into(), 250.into());
+
+        let mut i = 0;
+        // Number of cycles from book
+        while i < 4000 {
+            d.computer().cycle(false);
+            i += 1;
+        }
+
+        assert_eq!(d.read_memory(0.into()), 261.into());
     }
 }
