@@ -1,4 +1,7 @@
 //! Reader for .vm files.
+//!
+//! # Checking function
+//! Checking the syntax of functions is hard. VM calls can be called outside of functions and multipe return statements are allowed within a function (using goto logic). The bare minimum is to confirm that a function has called return at least once, which is what I do.
 
 use crate::{Command, Error, Segment};
 
@@ -16,7 +19,7 @@ pub struct Reader<R> {
     arg2: String,
     arg3: i16,
     line: usize,
-    in_func: bool, // True between starting a function and returning. Cannot start a new function while this is true.
+    func_returned: bool, // Has a function called at least one return statement
 }
 
 impl<R: std::io::BufRead> Reader<R> {
@@ -29,7 +32,7 @@ impl<R: std::io::BufRead> Reader<R> {
             arg2: "".to_string(),
             arg3: 0,
             line: 0,
-            in_func: false,
+            func_returned: true,
         }
     }
 
@@ -192,10 +195,10 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "function" => {
                 self.assert_args(3)?;
-                if self.in_func {
+                if !self.func_returned {
                     Err(Error::InvalidFunction(self.line))
                 } else {
-                    self.in_func = true;
+                    self.func_returned = false;
                     Ok(Command::Function(self.check_label_func()?, self.arg3))
                 }
             }
@@ -205,12 +208,8 @@ impl<R: std::io::BufRead> Reader<R> {
             }
             "return" => {
                 self.assert_args(1)?;
-                if self.in_func {
-                    self.in_func = false;
-                    Ok(Command::Return)
-                } else {
-                    Err(Error::InvalidFunction(self.line))
-                }
+                self.func_returned = true;
+                Ok(Command::Return)
             }
             _ => Err(Error::UnknownCommand(self.line)),
         }

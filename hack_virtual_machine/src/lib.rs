@@ -207,8 +207,8 @@ impl VirtualMachine {
                 self.call_call(s, *args);
             }
             Command::Return => {
+                // Doesn't set `self.func` to None because multiple return statements (with goto logic) are possible
                 self.add_comment("RETURN".to_string());
-                self.func = None;
                 self.translated.extend([
                     AssemblyLine::Assembly(ACommand::Symbol("RETURN".to_string()).into()),
                     AssemblyLine::Assembly(CCommand::new_jump(CComp::One, CJump::Jump).into()),
